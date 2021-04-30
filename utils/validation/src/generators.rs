@@ -3,6 +3,8 @@ use std::{
     iter::FromIterator,
 };
 
+use num_traits::Zero;
+
 use casper_execution_engine::shared::{
     account::{Account, ActionThresholds, AssociatedKeys},
     stored_value::StoredValue,
@@ -23,6 +25,47 @@ use casper_validation::{
     error::Error,
     Fixture, TestFixtures,
 };
+
+fn make_keys() -> Vec<(String, Key)> {
+    vec![
+        (
+            "Account".to_string(),
+            Key::Account(AccountHash::new([42; 32])),
+        ),
+        ("Hash".to_string(), Key::Hash([43; 32])),
+        (
+            "URef".to_string(),
+            Key::URef(URef::new([44; 32], AccessRights::NONE)),
+        ),
+        (
+            "URef_READ".to_string(),
+            Key::URef(URef::new([45; 32], AccessRights::READ)),
+        ),
+        (
+            "URef_ADD".to_string(),
+            Key::URef(URef::new([46; 32], AccessRights::ADD)),
+        ),
+        (
+            "URef_WRITE".to_string(),
+            Key::URef(URef::new([47; 32], AccessRights::WRITE)),
+        ),
+        (
+            "Transfer".to_string(),
+            Key::Transfer(TransferAddr::new([48; 32])),
+        ),
+        (
+            "DeployInfo".to_string(),
+            Key::DeployInfo(DeployHash::new([49; 32])),
+        ),
+        ("EraInfo".to_string(), Key::EraInfo(EraId::from(50))),
+        ("Balance".to_string(), Key::Balance([51; 32])),
+        ("Bid".to_string(), Key::Bid(AccountHash::new([52; 32]))),
+        (
+            "Withdraw".to_string(),
+            Key::Withdraw(AccountHash::new([53; 32])),
+        ),
+    ]
+}
 
 pub fn make_abi_test_fixtures() -> Result<TestFixtures, Error> {
     let basic = {
@@ -369,5 +412,305 @@ pub fn make_abi_test_fixtures() -> Result<TestFixtures, Error> {
         Fixture::ABI("stored_value".to_string(), ABIFixture::from(stored_value))
     };
 
-    Ok(vec![basic, transform, stored_value])
+    let clvalue = {
+        let mut clvalue = BTreeMap::new();
+
+        // CL_TYPE_TAG_BOOL
+        let bool_value_true = CLValue::from_t(true).unwrap();
+        clvalue.insert(
+            "bool_value_true".to_string(),
+            ABITestCase::from_inputs(vec![bool_value_true.into()]).unwrap(),
+        );
+
+        let bool_value_false = CLValue::from_t(false).unwrap();
+        clvalue.insert(
+            "bool_value_false".to_string(),
+            ABITestCase::from_inputs(vec![bool_value_false.into()]).unwrap(),
+        );
+
+        // CL_TYPE_TAG_I32
+        let i32_value_positive = CLValue::from_t(i32::MAX).unwrap();
+        clvalue.insert(
+            "i32_value_positive".to_string(),
+            ABITestCase::from_inputs(vec![i32_value_positive.into()]).unwrap(),
+        );
+
+        let i32_value_negative = CLValue::from_t(i32::MIN).unwrap();
+        clvalue.insert(
+            "i32_value_negative".to_string(),
+            ABITestCase::from_inputs(vec![i32_value_negative.into()]).unwrap(),
+        );
+
+        // CL_TYPE_TAG_I64
+        let i64_value_positive = CLValue::from_t(i64::MAX).unwrap();
+        clvalue.insert(
+            "i64_value_positive".to_string(),
+            ABITestCase::from_inputs(vec![i64_value_positive.into()]).unwrap(),
+        );
+
+        let i64_value_negative = CLValue::from_t(i64::MIN).unwrap();
+        clvalue.insert(
+            "i64_value_negative".to_string(),
+            ABITestCase::from_inputs(vec![i64_value_negative.into()]).unwrap(),
+        );
+
+        // CL_TYPE_TAG_U8
+        let u8_value_positive = CLValue::from_t(u8::MAX).unwrap();
+        clvalue.insert(
+            "u8_value_positive".to_string(),
+            ABITestCase::from_inputs(vec![u8_value_positive.into()]).unwrap(),
+        );
+
+        let u8_value_zero = CLValue::from_t(u8::zero()).unwrap();
+        clvalue.insert(
+            "u8_value_zero".to_string(),
+            ABITestCase::from_inputs(vec![u8_value_zero.into()]).unwrap(),
+        );
+
+        // CL_TYPE_TAG_U32
+        let u32_value_positive = CLValue::from_t(u32::MAX).unwrap();
+        clvalue.insert(
+            "u32_value_positive".to_string(),
+            ABITestCase::from_inputs(vec![u32_value_positive.into()]).unwrap(),
+        );
+
+        let u32_value_zero = CLValue::from_t(u32::zero()).unwrap();
+        clvalue.insert(
+            "u32_value_zero".to_string(),
+            ABITestCase::from_inputs(vec![u32_value_zero.into()]).unwrap(),
+        );
+
+        // CL_TYPE_TAG_U64
+        let u64_value_positive = CLValue::from_t(u64::MAX).unwrap();
+        clvalue.insert(
+            "u64_value_positive".to_string(),
+            ABITestCase::from_inputs(vec![u64_value_positive.into()]).unwrap(),
+        );
+
+        let u64_value_zero = CLValue::from_t(u64::zero()).unwrap();
+        clvalue.insert(
+            "u64_value_zero".to_string(),
+            ABITestCase::from_inputs(vec![u64_value_zero.into()]).unwrap(),
+        );
+
+        // CL_TYPE_TAG_U128
+        let u64_value_positive = CLValue::from_t(U128::MAX).unwrap();
+        clvalue.insert(
+            "u64_value_positive".to_string(),
+            ABITestCase::from_inputs(vec![u64_value_positive.into()]).unwrap(),
+        );
+
+        let u64_value_zero = CLValue::from_t(U128::zero()).unwrap();
+        clvalue.insert(
+            "u64_value_zero".to_string(),
+            ABITestCase::from_inputs(vec![u64_value_zero.into()]).unwrap(),
+        );
+
+        // CL_TYPE_TAG_U256
+        let u256_value_positive = CLValue::from_t(U256::MAX).unwrap();
+        clvalue.insert(
+            "u256_value_positive".to_string(),
+            ABITestCase::from_inputs(vec![u256_value_positive.into()]).unwrap(),
+        );
+
+        let u256_value_zero = CLValue::from_t(U256::zero()).unwrap();
+        clvalue.insert(
+            "u256_value_zero".to_string(),
+            ABITestCase::from_inputs(vec![u256_value_zero.into()]).unwrap(),
+        );
+
+        // CL_TYPE_TAG_U512
+        let u512_value_positive = CLValue::from_t(U512::MAX).unwrap();
+        clvalue.insert(
+            "u512_value_positive".to_string(),
+            ABITestCase::from_inputs(vec![u512_value_positive.into()]).unwrap(),
+        );
+
+        let u512_value_zero = CLValue::from_t(U512::zero()).unwrap();
+        clvalue.insert(
+            "u512_value_zero".to_string(),
+            ABITestCase::from_inputs(vec![u512_value_zero.into()]).unwrap(),
+        );
+
+        // CL_TYPE_TAG_UNIT
+        let unit_value = CLValue::unit();
+        clvalue.insert(
+            "unit".to_string(),
+            ABITestCase::from_inputs(vec![unit_value.into()]).unwrap(),
+        );
+
+        // CL_TYPE_TAG_STRING
+        let string_value = CLValue::from_t("Hello, world!".to_string()).unwrap();
+        clvalue.insert(
+            "string_value".to_string(),
+            ABITestCase::from_inputs(vec![string_value.into()]).unwrap(),
+        );
+
+        // CL_TYPE_TAG_KEY
+        for (description, key) in make_keys() {
+            let clvalue_key = CLValue::from_t(key).unwrap();
+            clvalue.insert(
+                description,
+                ABITestCase::from_inputs(vec![clvalue_key.into()]).unwrap(),
+            );
+        }
+
+        // CL_TYPE_TAG_UREF
+        let clvalue_uref =
+            CLValue::from_t(URef::new([254; 32], AccessRights::READ_ADD_WRITE)).unwrap();
+        clvalue.insert(
+            "clvalue_uref".to_string(),
+            ABITestCase::from_inputs(vec![clvalue_uref.into()]).unwrap(),
+        );
+        // CL_TYPE_TAG_OPTION
+        let clvalue_optional_string_none = CLValue::from_t(Option::<String>::None).unwrap();
+        clvalue.insert(
+            "clvalue_optional_string_none".to_string(),
+            ABITestCase::from_inputs(vec![clvalue_optional_string_none.into()]).unwrap(),
+        );
+        let clvalue_optional_string_some =
+            CLValue::from_t(Some("Hello, world!".to_string())).unwrap();
+        clvalue.insert(
+            "clvalue_optional_string_some".to_string(),
+            ABITestCase::from_inputs(vec![clvalue_optional_string_some.into()]).unwrap(),
+        );
+
+        // CL_TYPE_TAG_LIST
+        let clvalue_vec_of_string = CLValue::from_t(vec![
+            "Hello".to_string(),
+            "world".to_string(),
+            "!".to_string(),
+        ])
+        .unwrap();
+        clvalue.insert(
+            "clvalue_vec_of_string".to_string(),
+            ABITestCase::from_inputs(vec![clvalue_vec_of_string.into()]).unwrap(),
+        );
+
+        let clvalue_vec_of_u512 = CLValue::from_t(vec![
+            U512::zero(),
+            U512::from(u8::MAX),
+            U512::from(u16::MAX),
+            U512::from(u32::MAX),
+            U512::from(u64::MAX),
+            U512::MAX,
+        ])
+        .unwrap();
+        clvalue.insert(
+            "clvalue_vec_of_u512".to_string(),
+            ABITestCase::from_inputs(vec![clvalue_vec_of_u512.into()]).unwrap(),
+        );
+        // CL_TYPE_TAG_BYTE_ARRAY
+        let clvalue_bytearray_8b = CLValue::from_t([255; 8]).unwrap();
+        clvalue.insert(
+            "clvalue_bytearray_8b".to_string(),
+            ABITestCase::from_inputs(vec![clvalue_bytearray_8b.into()]).unwrap(),
+        );
+        let clvalue_bytearray_32b = CLValue::from_t([42u8; 32]).unwrap();
+        clvalue.insert(
+            "clvalue_bytearray_32b".to_string(),
+            ABITestCase::from_inputs(vec![clvalue_bytearray_32b.into()]).unwrap(),
+        );
+        let clvalue_bytearray_256b = CLValue::from_t([254; 256]).unwrap();
+        clvalue.insert(
+            "clvalue_bytearray_256b".to_string(),
+            ABITestCase::from_inputs(vec![clvalue_bytearray_256b.into()]).unwrap(),
+        );
+        // CL_TYPE_TAG_RESULT
+        type TestResult = Result<String, u32>;
+        let clvalue_ok = CLValue::from_t(TestResult::Ok("Success".to_string())).unwrap();
+        clvalue.insert(
+            "clvalue_ok".to_string(),
+            ABITestCase::from_inputs(vec![clvalue_ok.into()]).unwrap(),
+        );
+        let clvalue_err = CLValue::from_t(TestResult::Err(u32::MAX)).unwrap();
+        clvalue.insert(
+            "clvalue_err".to_string(),
+            ABITestCase::from_inputs(vec![clvalue_err.into()]).unwrap(),
+        );
+        // CL_TYPE_TAG_MAP
+
+        let clvalue_string_to_u512 = {
+            let mut test_map = BTreeMap::new();
+            test_map.insert("Alice".to_string(), U512::MAX);
+            test_map.insert("Bob".to_string(), U512::from(u64::MAX) + U512::one());
+            CLValue::from_t(test_map).unwrap()
+        };
+        clvalue.insert(
+            "clvalue_map_string_to_u512".to_string(),
+            ABITestCase::from_inputs(vec![clvalue_string_to_u512.into()]).unwrap(),
+        );
+        // CL_TYPE_TAG_TUPLE1
+        let clvalue_tuple_1 = CLValue::from_t(("Hello, world!".to_string(),)).unwrap();
+        clvalue.insert(
+            "clvalue_tuple_1".to_string(),
+            ABITestCase::from_inputs(vec![clvalue_tuple_1.into()]).unwrap(),
+        );
+        // CL_TYPE_TAG_TUPLE2
+        let clvalue_tuple_2 = CLValue::from_t((U512::zero(), U512::MAX)).unwrap();
+        clvalue.insert(
+            "clvalue_tuple_2".to_string(),
+            ABITestCase::from_inputs(vec![clvalue_tuple_2.into()]).unwrap(),
+        );
+        // CL_TYPE_TAG_TUPLE3
+        let clvalue_tuple_3 =
+            CLValue::from_t((U512::zero(), U512::from(u64::MAX) + U512::one(), U512::MAX)).unwrap();
+        clvalue.insert(
+            "clvalue_tuple_3".to_string(),
+            ABITestCase::from_inputs(vec![clvalue_tuple_3.into()]).unwrap(),
+        );
+        // CL_TYPE_TAG_ANY
+        let clvalue_any =
+            CLValue::from_components(CLType::Any, 0xdeadbeefu32.to_be_bytes().to_vec());
+        clvalue.insert(
+            "clvalue_any".to_string(),
+            ABITestCase::from_inputs(vec![clvalue_any.into()]).unwrap(),
+        );
+        // CL_TYPE_TAG_PUBLIC_KEY
+        let ed25519_secret_key = SecretKey::ed25519_from_bytes(&[42; 32]).unwrap();
+        let ed25519_pubkey = PublicKey::from(&ed25519_secret_key);
+        let clvalue_ed25519_pubkey = CLValue::from_t(ed25519_pubkey).unwrap();
+        clvalue.insert(
+            "clvalue_ed25519_pubkey".to_string(),
+            ABITestCase::from_inputs(vec![clvalue_ed25519_pubkey.into()]).unwrap(),
+        );
+
+        let ed25519_secret_key = SecretKey::ed25519_from_bytes(&[42; 32]).unwrap();
+        let ed25519_pubkey = PublicKey::from(&ed25519_secret_key);
+        let clvalue_ed25519_pubkey = CLValue::from_t(ed25519_pubkey).unwrap();
+        clvalue.insert(
+            "clvalue_ed25519_pubkey".to_string(),
+            ABITestCase::from_inputs(vec![clvalue_ed25519_pubkey.into()]).unwrap(),
+        );
+
+        let secp256k1_secret_key = SecretKey::secp256k1_from_bytes(&[42; 32]).unwrap();
+        let secp256k1_pubkey = PublicKey::from(&secp256k1_secret_key);
+        let clvalue_secp256k1_pubkey = CLValue::from_t(secp256k1_pubkey).unwrap();
+        clvalue.insert(
+            "clvalue_secp256k1_pubkey".to_string(),
+            ABITestCase::from_inputs(vec![clvalue_secp256k1_pubkey.into()]).unwrap(),
+        );
+
+        let clvalue_string_to_list_of_optional_u512 = {
+            let mut test_map = BTreeMap::new();
+            test_map.insert(
+                "Alice".to_string(),
+                vec![Some(U512::zero()), Some(U512::MAX), None],
+            );
+            test_map.insert(
+                "Bob".to_string(),
+                vec![Some(U512::from(u64::MAX) + U512::one()), None],
+            );
+            test_map.insert("Charlie".to_string(), vec![None, None, None]);
+            CLValue::from_t(test_map).unwrap()
+        };
+        clvalue.insert(
+            "clvalue_string_to_list_of_optional_u512".to_string(),
+            ABITestCase::from_inputs(vec![clvalue_string_to_list_of_optional_u512.into()]).unwrap(),
+        );
+
+        Fixture::ABI("clvalue".to_string(), ABIFixture::from(clvalue))
+    };
+
+    Ok(vec![basic, transform, stored_value, clvalue])
 }

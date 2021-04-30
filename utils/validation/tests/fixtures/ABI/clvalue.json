@@ -1,42 +1,760 @@
 {
-    "String": {
-        "input": [
-            [
-                "CLValue",
-                {
-                    "cl_type": "String",
-                    "bytes": "0d00000048656c6c6f2c20776f726c6421",
-                    "parsed": "Hello, world!"
+  "Account": {
+    "input": [
+      {
+        "type": "CLValue",
+        "value": {
+          "cl_type": "Key",
+          "bytes": "002a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a",
+          "parsed": {
+            "Account": "account-hash-2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a"
+          }
+        }
+      }
+    ],
+    "output": "21000000002a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a0b"
+  },
+  "Balance": {
+    "input": [
+      {
+        "type": "CLValue",
+        "value": {
+          "cl_type": "Key",
+          "bytes": "063333333333333333333333333333333333333333333333333333333333333333",
+          "parsed": {
+            "Balance": "balance-3333333333333333333333333333333333333333333333333333333333333333"
+          }
+        }
+      }
+    ],
+    "output": "210000000633333333333333333333333333333333333333333333333333333333333333330b"
+  },
+  "Bid": {
+    "input": [
+      {
+        "type": "CLValue",
+        "value": {
+          "cl_type": "Key",
+          "bytes": "073434343434343434343434343434343434343434343434343434343434343434",
+          "parsed": {
+            "Bid": "bid-3434343434343434343434343434343434343434343434343434343434343434"
+          }
+        }
+      }
+    ],
+    "output": "210000000734343434343434343434343434343434343434343434343434343434343434340b"
+  },
+  "DeployInfo": {
+    "input": [
+      {
+        "type": "CLValue",
+        "value": {
+          "cl_type": "Key",
+          "bytes": "043131313131313131313131313131313131313131313131313131313131313131",
+          "parsed": {
+            "DeployInfo": "deploy-3131313131313131313131313131313131313131313131313131313131313131"
+          }
+        }
+      }
+    ],
+    "output": "210000000431313131313131313131313131313131313131313131313131313131313131310b"
+  },
+  "EraInfo": {
+    "input": [
+      {
+        "type": "CLValue",
+        "value": {
+          "cl_type": "Key",
+          "bytes": "053200000000000000",
+          "parsed": {
+            "EraInfo": "era-50"
+          }
+        }
+      }
+    ],
+    "output": "090000000532000000000000000b"
+  },
+  "Hash": {
+    "input": [
+      {
+        "type": "CLValue",
+        "value": {
+          "cl_type": "Key",
+          "bytes": "012b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b",
+          "parsed": {
+            "Hash": "hash-2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b"
+          }
+        }
+      }
+    ],
+    "output": "21000000012b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b0b"
+  },
+  "Transfer": {
+    "input": [
+      {
+        "type": "CLValue",
+        "value": {
+          "cl_type": "Key",
+          "bytes": "033030303030303030303030303030303030303030303030303030303030303030",
+          "parsed": {
+            "Transfer": "transfer-3030303030303030303030303030303030303030303030303030303030303030"
+          }
+        }
+      }
+    ],
+    "output": "210000000330303030303030303030303030303030303030303030303030303030303030300b"
+  },
+  "URef": {
+    "input": [
+      {
+        "type": "CLValue",
+        "value": {
+          "cl_type": "Key",
+          "bytes": "022c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c00",
+          "parsed": {
+            "URef": "uref-2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c-000"
+          }
+        }
+      }
+    ],
+    "output": "22000000022c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c000b"
+  },
+  "URef_ADD": {
+    "input": [
+      {
+        "type": "CLValue",
+        "value": {
+          "cl_type": "Key",
+          "bytes": "022e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e04",
+          "parsed": {
+            "URef": "uref-2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e-004"
+          }
+        }
+      }
+    ],
+    "output": "22000000022e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e040b"
+  },
+  "URef_READ": {
+    "input": [
+      {
+        "type": "CLValue",
+        "value": {
+          "cl_type": "Key",
+          "bytes": "022d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d01",
+          "parsed": {
+            "URef": "uref-2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d-001"
+          }
+        }
+      }
+    ],
+    "output": "22000000022d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d010b"
+  },
+  "URef_WRITE": {
+    "input": [
+      {
+        "type": "CLValue",
+        "value": {
+          "cl_type": "Key",
+          "bytes": "022f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f02",
+          "parsed": {
+            "URef": "uref-2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f-002"
+          }
+        }
+      }
+    ],
+    "output": "22000000022f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f020b"
+  },
+  "Withdraw": {
+    "input": [
+      {
+        "type": "CLValue",
+        "value": {
+          "cl_type": "Key",
+          "bytes": "083535353535353535353535353535353535353535353535353535353535353535",
+          "parsed": {
+            "Withdraw": "withdraw-3535353535353535353535353535353535353535353535353535353535353535"
+          }
+        }
+      }
+    ],
+    "output": "210000000835353535353535353535353535353535353535353535353535353535353535350b"
+  },
+  "bool_value_false": {
+    "input": [
+      {
+        "type": "CLValue",
+        "value": {
+          "cl_type": "Bool",
+          "bytes": "00",
+          "parsed": false
+        }
+      }
+    ],
+    "output": "010000000000"
+  },
+  "bool_value_true": {
+    "input": [
+      {
+        "type": "CLValue",
+        "value": {
+          "cl_type": "Bool",
+          "bytes": "01",
+          "parsed": true
+        }
+      }
+    ],
+    "output": "010000000100"
+  },
+  "clvalue_any": {
+    "input": [
+      {
+        "type": "CLValue",
+        "value": {
+          "cl_type": "Any",
+          "bytes": "deadbeef",
+          "parsed": null
+        }
+      }
+    ],
+    "output": "04000000deadbeef15"
+  },
+  "clvalue_bytearray_256b": {
+    "input": [
+      {
+        "type": "CLValue",
+        "value": {
+          "cl_type": {
+            "ByteArray": 256
+          },
+          "bytes": "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe",
+          "parsed": "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe"
+        }
+      }
+    ],
+    "output": "00010000fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe0f00010000"
+  },
+  "clvalue_bytearray_32b": {
+    "input": [
+      {
+        "type": "CLValue",
+        "value": {
+          "cl_type": {
+            "ByteArray": 32
+          },
+          "bytes": "2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a",
+          "parsed": "2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a"
+        }
+      }
+    ],
+    "output": "200000002a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a0f20000000"
+  },
+  "clvalue_bytearray_8b": {
+    "input": [
+      {
+        "type": "CLValue",
+        "value": {
+          "cl_type": {
+            "ByteArray": 8
+          },
+          "bytes": "ffffffffffffffff",
+          "parsed": "ffffffffffffffff"
+        }
+      }
+    ],
+    "output": "08000000ffffffffffffffff0f08000000"
+  },
+  "clvalue_ed25519_pubkey": {
+    "input": [
+      {
+        "type": "CLValue",
+        "value": {
+          "cl_type": "PublicKey",
+          "bytes": "01197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d61",
+          "parsed": "01197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d61"
+        }
+      }
+    ],
+    "output": "2100000001197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d6116"
+  },
+  "clvalue_err": {
+    "input": [
+      {
+        "type": "CLValue",
+        "value": {
+          "cl_type": {
+            "Result": {
+              "ok": "String",
+              "err": "U32"
+            }
+          },
+          "bytes": "00ffffffff",
+          "parsed": {
+            "Err": 4294967295
+          }
+        }
+      }
+    ],
+    "output": "0500000000ffffffff100a04"
+  },
+  "clvalue_map_string_to_u512": {
+    "input": [
+      {
+        "type": "CLValue",
+        "value": {
+          "cl_type": {
+            "Map": {
+              "key": "String",
+              "value": "U512"
+            }
+          },
+          "bytes": "0200000005000000416c69636540ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff03000000426f6209000000000000000001",
+          "parsed": [
+            {
+              "key": "Alice",
+              "value": "13407807929942597099574024998205846127479365820592393377723561443721764030073546976801874298166903427690031858186486050853753882811946569946433649006084095"
+            },
+            {
+              "key": "Bob",
+              "value": "18446744073709551616"
+            }
+          ]
+        }
+      }
+    ],
+    "output": "5f0000000200000005000000416c69636540ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff03000000426f6209000000000000000001110a08"
+  },
+  "clvalue_ok": {
+    "input": [
+      {
+        "type": "CLValue",
+        "value": {
+          "cl_type": {
+            "Result": {
+              "ok": "String",
+              "err": "U32"
+            }
+          },
+          "bytes": "010700000053756363657373",
+          "parsed": {
+            "Ok": "Success"
+          }
+        }
+      }
+    ],
+    "output": "0c000000010700000053756363657373100a04"
+  },
+  "clvalue_optional_string_none": {
+    "input": [
+      {
+        "type": "CLValue",
+        "value": {
+          "cl_type": {
+            "Option": "String"
+          },
+          "bytes": "00",
+          "parsed": null
+        }
+      }
+    ],
+    "output": "01000000000d0a"
+  },
+  "clvalue_optional_string_some": {
+    "input": [
+      {
+        "type": "CLValue",
+        "value": {
+          "cl_type": {
+            "Option": "String"
+          },
+          "bytes": "010d00000048656c6c6f2c20776f726c6421",
+          "parsed": "Hello, world!"
+        }
+      }
+    ],
+    "output": "12000000010d00000048656c6c6f2c20776f726c64210d0a"
+  },
+  "clvalue_secp256k1_pubkey": {
+    "input": [
+      {
+        "type": "CLValue",
+        "value": {
+          "cl_type": "PublicKey",
+          "bytes": "02035be5e9478209674a96e60f1f037f6176540fd001fa1d64694770c56a7709c42c",
+          "parsed": "02035be5e9478209674a96e60f1f037f6176540fd001fa1d64694770c56a7709c42c"
+        }
+      }
+    ],
+    "output": "2200000002035be5e9478209674a96e60f1f037f6176540fd001fa1d64694770c56a7709c42c16"
+  },
+  "clvalue_string_to_list_of_optional_u512": {
+    "input": [
+      {
+        "type": "CLValue",
+        "value": {
+          "cl_type": {
+            "Map": {
+              "key": "String",
+              "value": {
+                "List": {
+                  "Option": "U512"
                 }
+              }
+            }
+          },
+          "bytes": "0300000005000000416c6963650300000001000140ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0003000000426f620200000001090000000000000000010007000000436861726c696503000000000000",
+          "parsed": [
+            {
+              "key": "Alice",
+              "value": [
+                "0",
+                "13407807929942597099574024998205846127479365820592393377723561443721764030073546976801874298166903427690031858186486050853753882811946569946433649006084095",
+                null
+              ]
+            },
+            {
+              "key": "Bob",
+              "value": [
+                "18446744073709551616",
+                null
+              ]
+            },
+            {
+              "key": "Charlie",
+              "value": [
+                null,
+                null,
+                null
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "output": "7f0000000300000005000000416c6963650300000001000140ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0003000000426f620200000001090000000000000000010007000000436861726c696503000000000000110a0e0d08"
+  },
+  "clvalue_tuple_1": {
+    "input": [
+      {
+        "type": "CLValue",
+        "value": {
+          "cl_type": {
+            "Tuple1": [
+              "String"
             ]
-        ],
-        "output": "110000000d00000048656c6c6f2c20776f726c64210a"
-    },
-    "Map": {
-        "input": [
-            [
-                "CLValue",
-                {
-                    "cl_type": {
-                        "Map": {
-                            "key": "String",
-                            "value": "U64"
-                        }
-                    },
-                    "bytes": "020000000300000061626301000000000000000300000078797a0200000000000000",
-                    "parsed": [
-                        {
-                            "key": "abc",
-                            "value": 1
-                        },
-                        {
-                            "key": "xyz",
-                            "value": 2
-                        }
-                    ]
-                }
+          },
+          "bytes": "0d00000048656c6c6f2c20776f726c6421",
+          "parsed": [
+            "Hello, world!"
+          ]
+        }
+      }
+    ],
+    "output": "110000000d00000048656c6c6f2c20776f726c6421120a"
+  },
+  "clvalue_tuple_2": {
+    "input": [
+      {
+        "type": "CLValue",
+        "value": {
+          "cl_type": {
+            "Tuple2": [
+              "U512",
+              "U512"
             ]
-        ],
-        "output": "22000000020000000300000061626301000000000000000300000078797a0200000000000000110a05"
-    }
+          },
+          "bytes": "0040ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "parsed": [
+            "0",
+            "13407807929942597099574024998205846127479365820592393377723561443721764030073546976801874298166903427690031858186486050853753882811946569946433649006084095"
+          ]
+        }
+      }
+    ],
+    "output": "420000000040ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff130808"
+  },
+  "clvalue_tuple_3": {
+    "input": [
+      {
+        "type": "CLValue",
+        "value": {
+          "cl_type": {
+            "Tuple3": [
+              "U512",
+              "U512",
+              "U512"
+            ]
+          },
+          "bytes": "000900000000000000000140ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "parsed": [
+            "0",
+            "18446744073709551616",
+            "13407807929942597099574024998205846127479365820592393377723561443721764030073546976801874298166903427690031858186486050853753882811946569946433649006084095"
+          ]
+        }
+      }
+    ],
+    "output": "4c000000000900000000000000000140ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff14080808"
+  },
+  "clvalue_uref": {
+    "input": [
+      {
+        "type": "CLValue",
+        "value": {
+          "cl_type": "URef",
+          "bytes": "fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe07",
+          "parsed": "uref-fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe-007"
+        }
+      }
+    ],
+    "output": "21000000fefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefe070c"
+  },
+  "clvalue_vec_of_string": {
+    "input": [
+      {
+        "type": "CLValue",
+        "value": {
+          "cl_type": {
+            "List": "String"
+          },
+          "bytes": "030000000500000048656c6c6f05000000776f726c640100000021",
+          "parsed": [
+            "Hello",
+            "world",
+            "!"
+          ]
+        }
+      }
+    ],
+    "output": "1b000000030000000500000048656c6c6f05000000776f726c6401000000210e0a"
+  },
+  "clvalue_vec_of_u512": {
+    "input": [
+      {
+        "type": "CLValue",
+        "value": {
+          "cl_type": {
+            "List": "U512"
+          },
+          "bytes": "060000000001ff02ffff04ffffffff08ffffffffffffffff40ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "parsed": [
+            "0",
+            "255",
+            "65535",
+            "4294967295",
+            "18446744073709551615",
+            "13407807929942597099574024998205846127479365820592393377723561443721764030073546976801874298166903427690031858186486050853753882811946569946433649006084095"
+          ]
+        }
+      }
+    ],
+    "output": "59000000060000000001ff02ffff04ffffffff08ffffffffffffffff40ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff0e08"
+  },
+  "i32_value_negative": {
+    "input": [
+      {
+        "type": "CLValue",
+        "value": {
+          "cl_type": "I32",
+          "bytes": "00000080",
+          "parsed": -2147483648
+        }
+      }
+    ],
+    "output": "040000000000008001"
+  },
+  "i32_value_positive": {
+    "input": [
+      {
+        "type": "CLValue",
+        "value": {
+          "cl_type": "I32",
+          "bytes": "ffffff7f",
+          "parsed": 2147483647
+        }
+      }
+    ],
+    "output": "04000000ffffff7f01"
+  },
+  "i64_value_negative": {
+    "input": [
+      {
+        "type": "CLValue",
+        "value": {
+          "cl_type": "I64",
+          "bytes": "0000000000000080",
+          "parsed": -9223372036854775808
+        }
+      }
+    ],
+    "output": "08000000000000000000008002"
+  },
+  "i64_value_positive": {
+    "input": [
+      {
+        "type": "CLValue",
+        "value": {
+          "cl_type": "I64",
+          "bytes": "ffffffffffffff7f",
+          "parsed": 9223372036854775807
+        }
+      }
+    ],
+    "output": "08000000ffffffffffffff7f02"
+  },
+  "string_value": {
+    "input": [
+      {
+        "type": "CLValue",
+        "value": {
+          "cl_type": "String",
+          "bytes": "0d00000048656c6c6f2c20776f726c6421",
+          "parsed": "Hello, world!"
+        }
+      }
+    ],
+    "output": "110000000d00000048656c6c6f2c20776f726c64210a"
+  },
+  "u256_value_positive": {
+    "input": [
+      {
+        "type": "CLValue",
+        "value": {
+          "cl_type": "U256",
+          "bytes": "20ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "parsed": "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+        }
+      }
+    ],
+    "output": "2100000020ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff07"
+  },
+  "u256_value_zero": {
+    "input": [
+      {
+        "type": "CLValue",
+        "value": {
+          "cl_type": "U256",
+          "bytes": "00",
+          "parsed": "0"
+        }
+      }
+    ],
+    "output": "010000000007"
+  },
+  "u32_value_positive": {
+    "input": [
+      {
+        "type": "CLValue",
+        "value": {
+          "cl_type": "U32",
+          "bytes": "ffffffff",
+          "parsed": 4294967295
+        }
+      }
+    ],
+    "output": "04000000ffffffff04"
+  },
+  "u32_value_zero": {
+    "input": [
+      {
+        "type": "CLValue",
+        "value": {
+          "cl_type": "U32",
+          "bytes": "00000000",
+          "parsed": 0
+        }
+      }
+    ],
+    "output": "040000000000000004"
+  },
+  "u512_value_positive": {
+    "input": [
+      {
+        "type": "CLValue",
+        "value": {
+          "cl_type": "U512",
+          "bytes": "40ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "parsed": "13407807929942597099574024998205846127479365820592393377723561443721764030073546976801874298166903427690031858186486050853753882811946569946433649006084095"
+        }
+      }
+    ],
+    "output": "4100000040ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff08"
+  },
+  "u512_value_zero": {
+    "input": [
+      {
+        "type": "CLValue",
+        "value": {
+          "cl_type": "U512",
+          "bytes": "00",
+          "parsed": "0"
+        }
+      }
+    ],
+    "output": "010000000008"
+  },
+  "u64_value_positive": {
+    "input": [
+      {
+        "type": "CLValue",
+        "value": {
+          "cl_type": "U128",
+          "bytes": "10ffffffffffffffffffffffffffffffff",
+          "parsed": "340282366920938463463374607431768211455"
+        }
+      }
+    ],
+    "output": "1100000010ffffffffffffffffffffffffffffffff06"
+  },
+  "u64_value_zero": {
+    "input": [
+      {
+        "type": "CLValue",
+        "value": {
+          "cl_type": "U128",
+          "bytes": "00",
+          "parsed": "0"
+        }
+      }
+    ],
+    "output": "010000000006"
+  },
+  "u8_value_positive": {
+    "input": [
+      {
+        "type": "CLValue",
+        "value": {
+          "cl_type": "U8",
+          "bytes": "ff",
+          "parsed": 255
+        }
+      }
+    ],
+    "output": "01000000ff03"
+  },
+  "u8_value_zero": {
+    "input": [
+      {
+        "type": "CLValue",
+        "value": {
+          "cl_type": "U8",
+          "bytes": "00",
+          "parsed": 0
+        }
+      }
+    ],
+    "output": "010000000003"
+  },
+  "unit": {
+    "input": [
+      {
+        "type": "CLValue",
+        "value": {
+          "cl_type": "Unit",
+          "bytes": "",
+          "parsed": null
+        }
+      }
+    ],
+    "output": "0000000009"
+  }
 }

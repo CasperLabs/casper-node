@@ -950,6 +950,7 @@ dependencies = [
  "clap 3.0.0-beta.2",
  "derive_more",
  "hex",
+ "num-traits",
  "rustc-test",
  "serde",
  "serde_json",
