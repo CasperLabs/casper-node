@@ -19,13 +19,21 @@ use crate::{account::AccountHash, EraId, PublicKey, U512};
 pub use bid::Bid;
 pub use constants::*;
 pub use delegator::Delegator;
-pub use era_info::*;
+pub use era_info::{EraInfo, SeigniorageAllocation};
 pub use error::Error;
 pub use providers::{
     AccountProvider, MintProvider, RuntimeProvider, StorageProvider, SystemProvider,
 };
 pub use seigniorage_recipient::SeigniorageRecipient;
 pub use unbonding_purse::UnbondingPurse;
+
+#[cfg(any(feature = "gens", test))]
+pub mod gens {
+    //! Re-exports all auction related sub-gens modules.
+    pub use crate::system::auction::{
+        bid::gens::*, delegator::gens::*, era_info::gens::*, unbonding_purse::gens::*, 
+    };
+}
 
 /// Representation of delegation rate of tokens. Range from 0..=100.
 pub type DelegationRate = u8;

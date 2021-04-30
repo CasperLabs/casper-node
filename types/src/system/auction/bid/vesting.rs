@@ -149,8 +149,8 @@ impl FromBytes for VestingSchedule {
 }
 
 /// Generators for [`VestingSchedule`]
-#[cfg(test)]
-mod gens {
+#[cfg(any(feature = "gens", test))]
+pub(crate) mod gens {
     use proptest::{
         array, option,
         prelude::{Arbitrary, Strategy},
@@ -159,6 +159,7 @@ mod gens {
     use super::VestingSchedule;
     use crate::gens::u512_arb;
 
+    /// Creates an arbitrary [`VestingSchedule`]
     pub fn vesting_schedule_arb() -> impl Strategy<Value = VestingSchedule> {
         (<u64>::arbitrary(), option::of(array::uniform14(u512_arb()))).prop_map(
             |(initial_release_timestamp_millis, locked_amounts)| VestingSchedule {

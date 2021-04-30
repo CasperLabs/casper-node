@@ -65,12 +65,13 @@ pub const SYSTEM_ACCOUNT: PublicKey = PublicKey::System;
 /// Operations on asymmetric cryptographic type.
 pub trait AsymmetricType<'a>
 where
-    Self: 'a + Sized + Tagged<u8>,
+    Self: 'a + Sized + Tagged,
+    Self::Tag: Into<u8>,
     &'a Self: Into<Vec<u8>>,
 {
     /// Converts `self` to hex, where the first byte represents the algorithm tag.
     fn to_hex(&'a self) -> String {
-        let bytes = iter::once(self.tag())
+        let bytes = iter::once(self.tag().into())
             .chain(self.into())
             .collect::<Vec<u8>>();
         hex::encode(bytes)
@@ -176,8 +177,10 @@ impl Display for SecretKey {
     }
 }
 
-impl Tagged<u8> for SecretKey {
-    fn tag(&self) -> u8 {
+impl Tagged for SecretKey {
+    type Tag = u8;
+
+    fn tag(&self) -> Self::Tag {
         match self {
             SecretKey::System => SYSTEM_TAG,
             SecretKey::Ed25519(_) => ED25519_TAG,
@@ -317,8 +320,10 @@ impl Hash for PublicKey {
     }
 }
 
-impl Tagged<u8> for PublicKey {
-    fn tag(&self) -> u8 {
+impl Tagged for PublicKey {
+    type Tag = u8;
+
+    fn tag(&self) -> Self::Tag {
         match self {
             PublicKey::System => SYSTEM_TAG,
             PublicKey::Ed25519(_) => ED25519_TAG,
@@ -553,8 +558,10 @@ impl Hash for Signature {
     }
 }
 
-impl Tagged<u8> for Signature {
-    fn tag(&self) -> u8 {
+impl Tagged for Signature {
+    type Tag = u8;
+
+    fn tag(&self) -> Self::Tag {
         match self {
             Signature::System => SYSTEM_TAG,
             Signature::Ed25519(_) => ED25519_TAG,
@@ -704,6 +711,7 @@ mod detail {
     pub fn serialize<'a, T, S>(value: &'a T, serializer: S) -> Result<S::Ok, S::Error>
     where
         T: AsymmetricType<'a>,
+        T::Tag: Into<u8>,
         Vec<u8>: From<&'a T>,
         S: Serializer,
         AsymmetricTypeAsBytes: From<&'a T>,
@@ -718,6 +726,7 @@ mod detail {
     pub fn deserialize<'a, 'de, T, D>(deserializer: D) -> Result<T, D::Error>
     where
         T: AsymmetricType<'a>,
+        T::Tag: Into<u8>,
         Vec<u8>: From<&'a T>,
         D: Deserializer<'de>,
     {

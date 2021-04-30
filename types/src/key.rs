@@ -11,6 +11,8 @@ use core::{
 
 use datasize::DataSize;
 use hex_fmt::HexFmt;
+use num_derive::{FromPrimitive, ToPrimitive};
+use num_traits::{FromPrimitive, ToPrimitive};
 use rand::{
     distributions::{Distribution, Standard},
     Rng,
@@ -64,7 +66,7 @@ impl From<HashAddr> for Key {
 }
 
 #[allow(missing_docs)]
-#[derive(Debug, Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialOrd, Ord, PartialEq, Eq, Hash, FromPrimitive, ToPrimitive)]
 #[repr(u8)]
 pub enum KeyTag {
     Account = 0,
@@ -76,6 +78,33 @@ pub enum KeyTag {
     Balance = 6,
     Bid = 7,
     Withdraw = 8,
+}
+
+impl From<KeyTag> for u8 {
+    fn from(key_tag: KeyTag) -> Self {
+        // NOTE: Considered safe safe as `KeyTag` is annotated with `repr(u8)`
+        key_tag.to_u8().unwrap()
+    }
+}
+
+impl FromBytes for KeyTag {
+    fn from_bytes(bytes: &[u8]) -> Result<(Self, &[u8]), Error> {
+        let (tag_value, rem) = FromBytes::from_bytes(bytes)?;
+        let tag = KeyTag::from_u8(tag_value).ok_or(Error::Formatting)?;
+        Ok((tag, rem))
+    }
+}
+
+impl ToBytes for KeyTag {
+    fn to_bytes(&self) -> Result<Vec<u8>, Error> {
+        let tag_value: u8 = (*self).into();
+        tag_value.to_bytes()
+    }
+
+    fn serialized_length(&self) -> usize {
+        let tag_value: u8 = (*self).into();
+        tag_value.serialized_length()
+    }
 }
 
 /// The type under which data (e.g. [`CLValue`](crate::CLValue)s, smart contracts, user accounts)
@@ -349,8 +378,10 @@ impl Debug for Key {
     }
 }
 
-impl Tagged<KeyTag> for Key {
-    fn tag(&self) -> KeyTag {
+impl Tagged for Key {
+    type Tag = KeyTag;
+
+    fn tag(&self) -> Self::Tag {
         match self {
             Key::Account(_) => KeyTag::Account,
             Key::Hash(_) => KeyTag::Hash,
@@ -362,13 +393,6 @@ impl Tagged<KeyTag> for Key {
             Key::Bid(_) => KeyTag::Bid,
             Key::Withdraw(_) => KeyTag::Withdraw,
         }
-    }
-}
-
-impl Tagged<u8> for Key {
-    fn tag(&self) -> u8 {
-        let key_tag: KeyTag = self.tag();
-        key_tag as u8
     }
 }
 
@@ -411,7 +435,7 @@ impl From<ContractPackageHash> for Key {
 impl ToBytes for Key {
     fn to_bytes(&self) -> Result<Vec<u8>, Error> {
         let mut result = bytesrepr::unchecked_allocate_buffer(self);
-        result.push(self.tag());
+        result.push(self.tag().into());
         match self {
             Key::Account(account_hash) => {
                 result.append(&mut account_hash.to_bytes()?);

@@ -3,17 +3,42 @@
 
 use alloc::{boxed::Box, vec::Vec};
 
+use num_derive::{FromPrimitive, ToPrimitive};
+use num_traits::{FromPrimitive, ToPrimitive};
 #[cfg(feature = "std")]
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::{
     bytesrepr::{self, FromBytes, ToBytes},
-    CLType, CLTyped, PublicKey, U512,
+    CLType, CLTyped, PublicKey, Tagged, U512,
 };
 
-const SEIGNIORAGE_ALLOCATION_VALIDATOR_TAG: u8 = 0;
-const SEIGNIORAGE_ALLOCATION_DELEGATOR_TAG: u8 = 1;
+#[derive(Copy, Clone, ToPrimitive, FromPrimitive)]
+#[repr(u8)]
+pub enum SeigniorageAllocationTag {
+    Validator = 0,
+    Delegator = 1,
+}
+
+impl ToBytes for SeigniorageAllocationTag {
+    fn to_bytes(&self) -> Result<Vec<u8>, bytesrepr::Error> {
+        self.to_u8().unwrap().to_bytes()
+    }
+
+    fn serialized_length(&self) -> usize {
+        self.to_u8().unwrap().serialized_length()
+    }
+}
+
+impl FromBytes for SeigniorageAllocationTag {
+    fn from_bytes(bytes: &[u8]) -> Result<(Self, &[u8]), bytesrepr::Error> {
+        let (tag_value, rem) = FromBytes::from_bytes(bytes)?;
+        let tag =
+            SeigniorageAllocationTag::from_u8(tag_value).ok_or(bytesrepr::Error::Formatting)?;
+        Ok((tag, rem))
+    }
+}
 
 /// Information about a seigniorage allocation
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq, Serialize, Deserialize)]
@@ -67,11 +92,15 @@ impl SeigniorageAllocation {
             SeigniorageAllocation::Delegator { amount, .. } => amount,
         }
     }
+}
 
-    fn tag(&self) -> u8 {
+impl Tagged for SeigniorageAllocation {
+    type Tag = SeigniorageAllocationTag;
+
+    fn tag(&self) -> Self::Tag {
         match self {
-            SeigniorageAllocation::Validator { .. } => SEIGNIORAGE_ALLOCATION_VALIDATOR_TAG,
-            SeigniorageAllocation::Delegator { .. } => SEIGNIORAGE_ALLOCATION_DELEGATOR_TAG,
+            SeigniorageAllocation::Validator { .. } => SeigniorageAllocationTag::Validator,
+            SeigniorageAllocation::Delegator { .. } => SeigniorageAllocationTag::Delegator,
         }
     }
 }
@@ -123,9 +152,9 @@ impl ToBytes for SeigniorageAllocation {
 
 impl FromBytes for SeigniorageAllocation {
     fn from_bytes(bytes: &[u8]) -> Result<(Self, &[u8]), bytesrepr::Error> {
-        let (tag, rem) = <u8>::from_bytes(bytes)?;
+        let (tag, rem) = SeigniorageAllocationTag::from_bytes(bytes)?;
         match tag {
-            SEIGNIORAGE_ALLOCATION_VALIDATOR_TAG => {
+            SeigniorageAllocationTag::Validator => {
                 let (validator_public_key, rem) = PublicKey::from_bytes(rem)?;
                 let (amount, rem) = U512::from_bytes(rem)?;
                 Ok((
@@ -133,7 +162,7 @@ impl FromBytes for SeigniorageAllocation {
                     rem,
                 ))
             }
-            SEIGNIORAGE_ALLOCATION_DELEGATOR_TAG => {
+            SeigniorageAllocationTag::Delegator => {
                 let (delegator_public_key, rem) = PublicKey::from_bytes(rem)?;
                 let (validator_public_key, rem) = PublicKey::from_bytes(rem)?;
                 let (amount, rem) = U512::from_bytes(rem)?;
@@ -146,7 +175,6 @@ impl FromBytes for SeigniorageAllocation {
                     rem,
                 ))
             }
-            _ => Err(bytesrepr::Error::Formatting),
         }
     }
 }
@@ -239,8 +267,7 @@ impl CLTyped for EraInfo {
 pub mod gens {
     use proptest::{
         collection::{self, SizeRange},
-        prelude::Strategy,
-        prop_oneof,
+        prelude::Strategy, prop_oneof,
     };
 
     use crate::{

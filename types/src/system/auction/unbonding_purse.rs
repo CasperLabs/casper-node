@@ -128,6 +128,34 @@ impl CLTyped for UnbondingPurse {
     }
 }
 
+#[cfg(any(feature = "gens", test))]
+pub(crate) mod gens {
+    use crate::{
+        crypto::gens::public_key_arb,
+        gens::{era_id_arb, u512_arb, uref_arb},
+    };
+    use proptest::prelude::*;
+
+    use super::UnbondingPurse;
+
+    prop_compose! {
+        /// Creates an arbitrary [`UnbondingPurse`]
+        pub fn unbonding_purse_arb()(bonding_purse in uref_arb(),
+                                            validator_public_key in public_key_arb(),
+                                            unbonder_public_key in public_key_arb(),
+                                            era_of_creation in era_id_arb(),
+                                            amount in u512_arb()) -> UnbondingPurse {
+            UnbondingPurse {
+                bonding_purse,
+                validator_public_key,
+                unbonder_public_key,
+                era_of_creation,
+                amount
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use once_cell::sync::Lazy;

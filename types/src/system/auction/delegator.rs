@@ -187,6 +187,41 @@ impl FromBytes for Delegator {
     }
 }
 
+#[cfg(any(feature = "gens", test))]
+pub(crate) mod gens {
+    use std::collections::BTreeMap;
+
+    use super::*;
+    use crate::{
+        crypto::gens::public_key_arb,
+        gens::{u512_arb, uref_arb},
+        system::auction::bid::gens::vesting_schedule_arb,
+    };
+    use proptest::{collection::btree_map, option, prelude::*};
+
+    prop_compose! {
+        /// Creates ca
+        pub fn delegator_arb()(delegator_public_key in public_key_arb(),
+                               staked_amount in u512_arb(),
+                               bonding_purse in uref_arb(),
+                               validator_public_key in public_key_arb(),
+                               vesting_schedule in option::of(vesting_schedule_arb())) -> Delegator {
+            Delegator {
+                delegator_public_key,
+                staked_amount,
+                bonding_purse,
+                validator_public_key,
+                vesting_schedule,
+            }
+        }
+    }
+
+    /// Creates an arbitrary delegators mapping.
+    pub fn delegators_arb() -> impl Strategy<Value = BTreeMap<PublicKey, Delegator>> {
+        btree_map(public_key_arb(), delegator_arb(), 0..10)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{
