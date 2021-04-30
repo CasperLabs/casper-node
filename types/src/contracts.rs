@@ -15,6 +15,8 @@ use core::{
 };
 
 use datasize::DataSize;
+use num_derive::{FromPrimitive, ToPrimitive};
+use num_traits::{FromPrimitive, ToPrimitive};
 #[cfg(feature = "std")]
 use schemars::{gen::SchemaGenerator, schema::Schema, JsonSchema};
 use serde::{de::Error as SerdeError, Deserialize, Deserializer, Serialize, Serializer};
@@ -1269,8 +1271,26 @@ pub enum EntryPointAccess {
     Groups(Vec<Group>),
 }
 
-const ENTRYPOINTACCESS_PUBLIC_TAG: u8 = 1;
-const ENTRYPOINTACCESS_GROUPS_TAG: u8 = 2;
+#[derive(FromPrimitive, ToPrimitive)]
+#[repr(u8)]
+enum EntryPointAccessTag {
+    Public,
+    Groups,
+}
+
+impl From<EntryPointAccessTag> for u8 {
+    fn from(tag: EntryPointAccessTag) -> Self {
+        tag.to_u8().unwrap()
+    }
+}
+
+impl FromBytes for EntryPointAccessTag {
+    fn from_bytes(bytes: &[u8]) -> Result<(Self, &[u8]), bytesrepr::Error> {
+        let (tag_value, rem) = FromBytes::from_bytes(bytes)?;
+        let tag = EntryPointAccessTag::from_u8(tag_value).ok_or(bytesrepr::Error::Formatting)?;
+        Ok((tag, rem))
+    }
+}
 
 impl EntryPointAccess {
     /// Constructor for access granted to only listed groups.
@@ -1286,10 +1306,10 @@ impl ToBytes for EntryPointAccess {
 
         match self {
             EntryPointAccess::Public => {
-                result.push(ENTRYPOINTACCESS_PUBLIC_TAG);
+                result.push(EntryPointAccessTag::Public.into());
             }
             EntryPointAccess::Groups(groups) => {
-                result.push(ENTRYPOINTACCESS_GROUPS_TAG);
+                result.push(EntryPointAccessTag::Groups.into());
                 result.append(&mut groups.to_bytes()?);
             }
         }
@@ -1306,16 +1326,15 @@ impl ToBytes for EntryPointAccess {
 
 impl FromBytes for EntryPointAccess {
     fn from_bytes(bytes: &[u8]) -> Result<(Self, &[u8]), bytesrepr::Error> {
-        let (tag, bytes) = u8::from_bytes(bytes)?;
+        let (tag, bytes) = EntryPointAccessTag::from_bytes(bytes)?;
 
         match tag {
-            ENTRYPOINTACCESS_PUBLIC_TAG => Ok((EntryPointAccess::Public, bytes)),
-            ENTRYPOINTACCESS_GROUPS_TAG => {
+            EntryPointAccessTag::Public => Ok((EntryPointAccess::Public, bytes)),
+            EntryPointAccessTag::Groups => {
                 let (groups, bytes) = Vec::<Group>::from_bytes(bytes)?;
                 let result = EntryPointAccess::Groups(groups);
                 Ok((result, bytes))
             }
-            _ => Err(bytesrepr::Error::Formatting),
         }
     }
 }
