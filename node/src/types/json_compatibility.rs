@@ -15,10 +15,7 @@ pub use stored_value::StoredValue;
 pub fn vectorize(keys: &NamedKeys) -> Vec<NamedKey> {
     let named_keys = keys
         .iter()
-        .map(|(name, key)| NamedKey {
-            name: name.clone(),
-            key: key.to_formatted_string(),
-        })
+        .map(|(name, key)| NamedKey::new(name.clone(), *key))
         .collect();
     named_keys
 }

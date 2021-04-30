@@ -204,14 +204,8 @@ pub fn make_abi_test_fixtures() -> Result<TestFixtures, Error> {
             let mut named_keys = Vec::new();
             let key_hash = Key::Hash([42; 32]);
             let key_uref = Key::URef(URef::new([43; 32], AccessRights::READ_ADD_WRITE));
-            named_keys.push(NamedKey {
-                name: "key 1".to_string(),
-                key: key_hash.to_formatted_string(),
-            });
-            named_keys.push(NamedKey {
-                name: "uref".to_string(),
-                key: key_uref.to_formatted_string(),
-            });
+            named_keys.push(NamedKey::new("key 1".to_string(), key_hash));
+            named_keys.push(NamedKey::new("uref".to_string(), key_uref));
             named_keys
         };
 

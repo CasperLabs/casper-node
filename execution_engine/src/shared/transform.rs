@@ -353,10 +353,7 @@ impl From<&Transform> for casper_types::Transform {
             Transform::AddKeys(named_keys) => casper_types::Transform::AddKeys(
                 named_keys
                     .iter()
-                    .map(|(name, key)| casper_types::NamedKey {
-                        name: name.clone(),
-                        key: key.to_formatted_string(),
-                    })
+                    .map(|(name, key)| casper_types::NamedKey::new(name.clone(), *key))
                     .collect(),
             ),
             Transform::Failure(error) => casper_types::Transform::Failure(error.to_string()),

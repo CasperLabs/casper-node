@@ -7,7 +7,10 @@ use alloc::{string::String, vec::Vec};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::bytesrepr::{self, FromBytes, ToBytes};
+use crate::{
+    bytesrepr::{self, FromBytes, ToBytes},
+    Key,
+};
 
 /// A named key.
 #[derive(Clone, Eq, PartialEq, Serialize, Deserialize, Default, Debug)]
@@ -15,9 +18,19 @@ use crate::bytesrepr::{self, FromBytes, ToBytes};
 #[serde(deny_unknown_fields)]
 pub struct NamedKey {
     /// The name of the entry.
-    pub name: String,
+    name: String,
     /// The value of the entry: a casper `Key` type.
-    pub key: String,
+    key: String,
+}
+
+impl NamedKey {
+    /// Creates new [`NamedKey`] instance using a name, and a key instance.
+    pub fn new(name: String, key: Key) -> Self {
+        Self {
+            name,
+            key: key.to_formatted_string(),
+        }
+    }
 }
 
 impl ToBytes for NamedKey {
