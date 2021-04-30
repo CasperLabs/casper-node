@@ -321,10 +321,14 @@ impl FromBytes for Bid {
 
 #[cfg(any(feature = "gens", test))]
 pub(crate) mod gens {
-    use crate::{crypto::gens::public_key_arb, gens::{u512_arb, uref_arb}, system::auction::{DelegationRate, gens::delegators_arb}};
-    use proptest::{option, prelude::*};
     use super::Bid;
     pub use crate::system::auction::bid::vesting::gens::*;
+    use crate::{
+        crypto::gens::public_key_arb,
+        gens::{u512_arb, uref_arb},
+        system::auction::{gens::delegators_arb, DelegationRate},
+    };
+    use proptest::{option, prelude::*};
 
     prop_compose! {
         /// Creates an arbitrary [`Bid`]

@@ -688,12 +688,17 @@ impl Distribution<Transform> for Standard {
 
 #[cfg(test)]
 pub(crate) mod gens {
+    use alloc::boxed::Box;
     use proptest::{collection::vec, prelude::*};
 
-    use crate::{deploy_info::gens::account_hash_arb, gens::{
-            cl_value_arb, deploy_info_arb, named_key_arb, transfer_arb, u128_arb,
-            u256_arb, u512_arb,
-        }, system::auction::gens::{bid_arb, era_info_arb, unbonding_purse_arb}};
+    use crate::{
+        deploy_info::gens::account_hash_arb,
+        gens::{
+            cl_value_arb, deploy_info_arb, named_key_arb, transfer_arb, u128_arb, u256_arb,
+            u512_arb,
+        },
+        system::auction::gens::{bid_arb, era_info_arb, unbonding_purse_arb},
+    };
 
     use crate::Transform;
 
@@ -719,12 +724,7 @@ pub(crate) mod gens {
             "\\PC+".prop_map(Transform::Failure),
         ]
     }
-
-    proptest! {
-      
-    }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -733,8 +733,7 @@ mod tests {
     use crate::bytesrepr;
 
     use super::gens;
-    #[test]fn foo(){}
-    
+
     proptest! {
         #[test]
         fn test_serialization_roundtrip(deploy_info in gens::transform_arb()) {

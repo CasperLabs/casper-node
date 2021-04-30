@@ -6,7 +6,6 @@ mod error;
 #[cfg(any(feature = "gens", test))]
 pub use asymmetric_key::gens;
 pub use asymmetric_key::{
-    AsymmetricType, PublicKey, SecretKey, Signature, ED25519_TAG, SECP256K1_TAG, SYSTEM_ACCOUNT,
-    SYSTEM_TAG,
+    AsymmetricKeyTag, AsymmetricType, PublicKey, SecretKey, Signature, SYSTEM_ACCOUNT,
 };
 pub use error::Error;

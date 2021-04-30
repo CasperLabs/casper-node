@@ -24,6 +24,8 @@ use k256::ecdsa::{
     Signature as Secp256k1Signature, SigningKey as Secp256k1SecretKey,
     VerifyingKey as Secp256k1PublicKey,
 };
+use num_derive::{FromPrimitive, ToPrimitive};
+use num_traits::{FromPrimitive, ToPrimitive};
 #[cfg(feature = "std")]
 use schemars::{gen::SchemaGenerator, schema::Schema, JsonSchema};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -42,18 +44,45 @@ pub mod gens;
 mod tests;
 
 const TAG_LENGTH: usize = U8_SERIALIZED_LENGTH;
-
-/// Tag for system variant.
-pub const SYSTEM_TAG: u8 = 0;
 const SYSTEM: &str = "System";
-
-/// Tag for ed25519 variant.
-pub const ED25519_TAG: u8 = 1;
 const ED25519: &str = "Ed25519";
-
-/// Tag for secp256k1 variant.
-pub const SECP256K1_TAG: u8 = 2;
 const SECP256K1: &str = "Secp256k1";
+
+/// Representation of a asymmetric key tag
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, FromPrimitive, ToPrimitive, Debug)]
+#[repr(u8)]
+pub enum AsymmetricKeyTag {
+    /// Tag for system variant.
+    System = 0,
+    /// Tag for ed25519 variant.
+    Ed25519 = 1,
+    /// Tag for secp256k1 variant.
+    Secp256k1 = 2,
+}
+
+impl AsymmetricKeyTag {
+    fn variant_name(self) -> &'static str {
+        match self {
+            AsymmetricKeyTag::System => SYSTEM,
+            AsymmetricKeyTag::Ed25519 => ED25519,
+            AsymmetricKeyTag::Secp256k1 => SECP256K1,
+        }
+    }
+}
+
+impl From<AsymmetricKeyTag> for u8 {
+    fn from(tag: AsymmetricKeyTag) -> Self {
+        tag.to_u8().unwrap()
+    }
+}
+
+impl FromBytes for AsymmetricKeyTag {
+    fn from_bytes(bytes: &[u8]) -> Result<(Self, &[u8]), bytesrepr::Error> {
+        let (tag_value, rem) = FromBytes::from_bytes(bytes)?;
+        let tag = AsymmetricKeyTag::from_u8(tag_value).ok_or(bytesrepr::Error::Formatting)?;
+        Ok((tag, rem))
+    }
+}
 
 const SECP256K1_SECRET_KEY_LENGTH: usize = 32;
 const SECP256K1_COMPRESSED_PUBLIC_KEY_LENGTH: usize = 33;
@@ -85,21 +114,24 @@ where
         }
 
         let (tag_bytes, key_bytes) = input.as_ref().split_at(2);
-        let mut tag = [0u8; 1];
-        hex::decode_to_slice(tag_bytes, tag.as_mut())?;
+        let mut tag_value = [0u8; 1];
+        hex::decode_to_slice(tag_bytes, tag_value.as_mut())?;
+        let tag = AsymmetricKeyTag::from_u8(tag_value[0]);
 
-        match tag[0] {
-            ED25519_TAG => {
+        match tag {
+            Some(AsymmetricKeyTag::Ed25519) => {
                 let bytes = hex::decode(key_bytes)?;
                 Self::ed25519_from_bytes(&bytes)
             }
-            SECP256K1_TAG => {
+            Some(AsymmetricKeyTag::Secp256k1) => {
                 let bytes = hex::decode(key_bytes)?;
                 Self::secp256k1_from_bytes(&bytes)
             }
-            _ => Err(Error::AsymmetricKey(format!(
+            Some(AsymmetricKeyTag::System) | None => Err(Error::AsymmetricKey(format!(
                 "invalid tag.  Expected {} or {}, got {}",
-                ED25519_TAG, SECP256K1_TAG, tag[0]
+                AsymmetricKeyTag::Ed25519.to_u64().unwrap(),
+                AsymmetricKeyTag::Secp256k1.to_u64().unwrap(),
+                tag_value[0]
             ))),
         }
     }
@@ -155,19 +187,11 @@ impl SecretKey {
             bytes.as_ref(),
         )?))
     }
-
-    fn variant_name(&self) -> &str {
-        match self {
-            SecretKey::System => SYSTEM,
-            SecretKey::Ed25519(_) => ED25519,
-            SecretKey::Secp256k1(_) => SECP256K1,
-        }
-    }
 }
 
 impl Debug for SecretKey {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-        write!(formatter, "SecretKey::{}", self.variant_name())
+        write!(formatter, "SecretKey::{}", self.tag().variant_name())
     }
 }
 
@@ -178,13 +202,13 @@ impl Display for SecretKey {
 }
 
 impl Tagged for SecretKey {
-    type Tag = u8;
+    type Tag = AsymmetricKeyTag;
 
     fn tag(&self) -> Self::Tag {
         match self {
-            SecretKey::System => SYSTEM_TAG,
-            SecretKey::Ed25519(_) => ED25519_TAG,
-            SecretKey::Secp256k1(_) => SECP256K1_TAG,
+            SecretKey::System => AsymmetricKeyTag::System,
+            SecretKey::Ed25519(_) => AsymmetricKeyTag::Ed25519,
+            SecretKey::Secp256k1(_) => AsymmetricKeyTag::Secp256k1,
         }
     }
 }
@@ -215,14 +239,6 @@ impl PublicKey {
     /// Creates an `AccountHash` from a given `PublicKey` instance.
     pub fn to_account_hash(&self) -> AccountHash {
         AccountHash::from(self)
-    }
-
-    fn variant_name(&self) -> &str {
-        match self {
-            PublicKey::System => SYSTEM,
-            PublicKey::Ed25519(_) => ED25519,
-            PublicKey::Secp256k1(_) => SECP256K1,
-        }
     }
 }
 
@@ -275,7 +291,7 @@ impl Debug for PublicKey {
         write!(
             formatter,
             "PublicKey::{}({})",
-            self.variant_name(),
+            self.tag().variant_name(),
             HexFmt(Into::<Vec<u8>>::into(self))
         )
     }
@@ -286,7 +302,7 @@ impl Display for PublicKey {
         write!(
             formatter,
             "PubKey::{}({:10})",
-            self.variant_name(),
+            self.tag().variant_name(),
             HexFmt(Into::<Vec<u8>>::into(self))
         )
     }
@@ -321,13 +337,13 @@ impl Hash for PublicKey {
 }
 
 impl Tagged for PublicKey {
-    type Tag = u8;
+    type Tag = AsymmetricKeyTag;
 
     fn tag(&self) -> Self::Tag {
         match self {
-            PublicKey::System => SYSTEM_TAG,
-            PublicKey::Ed25519(_) => ED25519_TAG,
-            PublicKey::Secp256k1(_) => SECP256K1_TAG,
+            PublicKey::System => AsymmetricKeyTag::System,
+            PublicKey::Ed25519(_) => AsymmetricKeyTag::Ed25519,
+            PublicKey::Secp256k1(_) => AsymmetricKeyTag::Secp256k1,
         }
     }
 }
@@ -337,15 +353,15 @@ impl ToBytes for PublicKey {
         let mut buffer = bytesrepr::allocate_buffer(self)?;
         match self {
             PublicKey::System => {
-                buffer.insert(0, SYSTEM_TAG);
+                buffer.insert(0, AsymmetricKeyTag::System.into());
             }
             PublicKey::Ed25519(public_key) => {
-                buffer.insert(0, ED25519_TAG);
+                buffer.insert(0, AsymmetricKeyTag::Ed25519.into());
                 let ed25519_bytes = public_key.as_bytes();
                 buffer.extend_from_slice(ed25519_bytes);
             }
             PublicKey::Secp256k1(public_key) => {
-                buffer.insert(0, SECP256K1_TAG);
+                buffer.insert(0, AsymmetricKeyTag::Secp256k1.into());
                 let secp256k1_bytes = public_key.to_bytes();
                 buffer.extend_from_slice(&secp256k1_bytes);
             }
@@ -365,24 +381,23 @@ impl ToBytes for PublicKey {
 
 impl FromBytes for PublicKey {
     fn from_bytes(bytes: &[u8]) -> Result<(Self, &[u8]), bytesrepr::Error> {
-        let (tag, remainder) = u8::from_bytes(bytes)?;
+        let (tag, remainder) = AsymmetricKeyTag::from_bytes(bytes)?;
         match tag {
-            SYSTEM_TAG => Ok((PublicKey::System, remainder)),
-            ED25519_TAG => {
+            AsymmetricKeyTag::System => Ok((PublicKey::System, remainder)),
+            AsymmetricKeyTag::Ed25519 => {
                 let (raw_bytes, remainder): ([u8; Self::ED25519_LENGTH], _) =
                     FromBytes::from_bytes(remainder)?;
                 let public_key = Self::ed25519_from_bytes(raw_bytes)
                     .map_err(|_error| bytesrepr::Error::Formatting)?;
                 Ok((public_key, remainder))
             }
-            SECP256K1_TAG => {
+            AsymmetricKeyTag::Secp256k1 => {
                 let (raw_bytes, remainder): ([u8; Self::SECP256K1_LENGTH], _) =
                     FromBytes::from_bytes(remainder)?;
                 let public_key = Self::secp256k1_from_bytes(raw_bytes)
                     .map_err(|_error| bytesrepr::Error::Formatting)?;
                 Ok((public_key, remainder))
             }
-            _ => Err(bytesrepr::Error::Formatting),
         }
     }
 }
@@ -467,14 +482,6 @@ impl Signature {
 
         Ok(Signature::Secp256k1(signature))
     }
-
-    fn variant_name(&self) -> &str {
-        match self {
-            Signature::System => SYSTEM,
-            Signature::Ed25519(_) => ED25519,
-            Signature::Secp256k1(_) => SECP256K1,
-        }
-    }
 }
 
 impl AsymmetricType<'_> for Signature {
@@ -508,7 +515,7 @@ impl Debug for Signature {
         write!(
             formatter,
             "Signature::{}({})",
-            self.variant_name(),
+            self.tag().variant_name(),
             HexFmt(Into::<Vec<u8>>::into(*self))
         )
     }
@@ -519,7 +526,7 @@ impl Display for Signature {
         write!(
             formatter,
             "Sig::{}({:10})",
-            self.variant_name(),
+            self.tag().variant_name(),
             HexFmt(Into::<Vec<u8>>::into(*self))
         )
     }
@@ -559,13 +566,13 @@ impl Hash for Signature {
 }
 
 impl Tagged for Signature {
-    type Tag = u8;
+    type Tag = AsymmetricKeyTag;
 
     fn tag(&self) -> Self::Tag {
         match self {
-            Signature::System => SYSTEM_TAG,
-            Signature::Ed25519(_) => ED25519_TAG,
-            Signature::Secp256k1(_) => SECP256K1_TAG,
+            Signature::System => AsymmetricKeyTag::System,
+            Signature::Ed25519(_) => AsymmetricKeyTag::Ed25519,
+            Signature::Secp256k1(_) => AsymmetricKeyTag::Secp256k1,
         }
     }
 }
@@ -575,15 +582,15 @@ impl ToBytes for Signature {
         let mut buffer = bytesrepr::allocate_buffer(self)?;
         match self {
             Signature::System => {
-                buffer.insert(0, SYSTEM_TAG);
+                buffer.insert(0, AsymmetricKeyTag::System.into());
             }
             Signature::Ed25519(signature) => {
-                buffer.insert(0, ED25519_TAG);
+                buffer.insert(0, AsymmetricKeyTag::Ed25519.into());
                 let ed5519_bytes = signature.to_bytes();
                 buffer.extend(&ed5519_bytes);
             }
             Signature::Secp256k1(signature) => {
-                buffer.insert(0, SECP256K1_TAG);
+                buffer.insert(0, AsymmetricKeyTag::Secp256k1.into());
                 let secp256k1_bytes = signature.as_ref();
                 buffer.extend_from_slice(secp256k1_bytes);
             }
@@ -603,24 +610,23 @@ impl ToBytes for Signature {
 
 impl FromBytes for Signature {
     fn from_bytes(bytes: &[u8]) -> Result<(Self, &[u8]), bytesrepr::Error> {
-        let (tag, remainder) = u8::from_bytes(bytes)?;
+        let (tag, remainder) = AsymmetricKeyTag::from_bytes(bytes)?;
         match tag {
-            SYSTEM_TAG => Ok((Signature::System, remainder)),
-            ED25519_TAG => {
+            AsymmetricKeyTag::System => Ok((Signature::System, remainder)),
+            AsymmetricKeyTag::Ed25519 => {
                 let (raw_bytes, remainder): ([u8; Self::ED25519_LENGTH], _) =
                     FromBytes::from_bytes(remainder)?;
                 let public_key =
                     Self::ed25519(raw_bytes).map_err(|_error| bytesrepr::Error::Formatting)?;
                 Ok((public_key, remainder))
             }
-            SECP256K1_TAG => {
+            AsymmetricKeyTag::Secp256k1 => {
                 let (raw_bytes, remainder): ([u8; Self::SECP256K1_LENGTH], _) =
                     FromBytes::from_bytes(remainder)?;
                 let public_key =
                     Self::secp256k1(raw_bytes).map_err(|_error| bytesrepr::Error::Formatting)?;
                 Ok((public_key, remainder))
             }
-            _ => Err(bytesrepr::Error::Formatting),
         }
     }
 }

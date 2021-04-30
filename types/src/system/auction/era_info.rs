@@ -267,7 +267,8 @@ impl CLTyped for EraInfo {
 pub mod gens {
     use proptest::{
         collection::{self, SizeRange},
-        prelude::Strategy, prop_oneof,
+        prelude::Strategy,
+        prop_oneof,
     };
 
     use crate::{

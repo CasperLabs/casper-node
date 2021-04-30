@@ -9,7 +9,7 @@ use pem::Pem;
 use rand::{Rng, RngCore};
 use untrusted::Input;
 
-use casper_types::{AsymmetricType, PublicKey, SecretKey, ED25519_TAG, SECP256K1_TAG, SYSTEM_TAG};
+use casper_types::{AsymmetricKeyTag, AsymmetricType, PublicKey, SecretKey};
 
 #[cfg(test)]
 use crate::testing::TestRng;
@@ -177,7 +177,7 @@ impl AsymmetricKeyExt for SecretKey {
                     })?
                     .as_slice_less_safe();
 
-                    return Ok((ED25519_TAG, raw_bytes));
+                    return Ok((AsymmetricKeyTag::Ed25519, raw_bytes));
                 } else if tag == Tag::OctetString as u8 {
                     // Expecting a secp256k1 key.
                     if version != 1 {
@@ -202,7 +202,7 @@ impl AsymmetricKeyExt for SecretKey {
                     // with unused bytes error.
                     let _ = derp::read_tag_and_get_value(input);
 
-                    return Ok((SECP256K1_TAG, raw_bytes));
+                    return Ok((AsymmetricKeyTag::Secp256k1, raw_bytes));
                 }
 
                 Err(derp::Error::WrongValue)
@@ -210,10 +210,15 @@ impl AsymmetricKeyExt for SecretKey {
         })?;
 
         match key_type_tag {
-            SYSTEM_TAG => Err(Error::AsymmetricKey("cannot construct variant".to_string())),
-            ED25519_TAG => SecretKey::ed25519_from_bytes(raw_bytes).map_err(Into::into),
-            SECP256K1_TAG => SecretKey::secp256k1_from_bytes(raw_bytes).map_err(Into::into),
-            _ => Err(Error::AsymmetricKey("unknown type tag".to_string())),
+            AsymmetricKeyTag::System => {
+                Err(Error::AsymmetricKey("cannot construct variant".to_string()))
+            }
+            AsymmetricKeyTag::Ed25519 => {
+                SecretKey::ed25519_from_bytes(raw_bytes).map_err(Into::into)
+            }
+            AsymmetricKeyTag::Secp256k1 => {
+                SecretKey::secp256k1_from_bytes(raw_bytes).map_err(Into::into)
+            }
         }
     }
 
@@ -339,16 +344,14 @@ impl AsymmetricKeyExt for PublicKey {
     fn from_der<T: AsRef<[u8]>>(input: T) -> Result<Self, Error> {
         let input = Input::from(input.as_ref());
 
-        let mut key_type_tag = ED25519_TAG;
-        let raw_bytes = input.read_all(derp::Error::Read, |input| {
+        let (key_type_tag, raw_bytes) = input.read_all(derp::Error::Read, |input| {
             derp::nested(input, Tag::Sequence, |input| {
-                derp::nested(input, Tag::Sequence, |input| {
+                let tag = derp::nested(input, Tag::Sequence, |input| {
                     // Read the first value.
                     let object_identifier =
                         derp::expect_tag_and_get_value(input, Tag::Oid)?.as_slice_less_safe();
                     if object_identifier == ED25519_OBJECT_IDENTIFIER {
-                        key_type_tag = ED25519_TAG;
-                        Ok(())
+                        Ok(AsymmetricKeyTag::Ed25519)
                     } else if object_identifier == EC_PUBLIC_KEY_OBJECT_IDENTIFIER {
                         // Assert the next object identifier is the secp256k1 ID.
                         let next_object_identifier =
@@ -357,19 +360,25 @@ impl AsymmetricKeyExt for PublicKey {
                             return Err(derp::Error::WrongValue);
                         }
 
-                        key_type_tag = SECP256K1_TAG;
-                        Ok(())
+                        Ok(AsymmetricKeyTag::Secp256k1)
                     } else {
                         Err(derp::Error::WrongValue)
                     }
                 })?;
-                Ok(derp::bit_string_with_no_unused_bits(input)?.as_slice_less_safe())
+                Ok((
+                    tag,
+                    derp::bit_string_with_no_unused_bits(input)?.as_slice_less_safe(),
+                ))
             })
         })?;
 
         match key_type_tag {
-            ED25519_TAG => PublicKey::ed25519_from_bytes(raw_bytes).map_err(Into::into),
-            SECP256K1_TAG => PublicKey::secp256k1_from_bytes(raw_bytes).map_err(Into::into),
+            AsymmetricKeyTag::Ed25519 => {
+                PublicKey::ed25519_from_bytes(raw_bytes).map_err(Into::into)
+            }
+            AsymmetricKeyTag::Secp256k1 => {
+                PublicKey::secp256k1_from_bytes(raw_bytes).map_err(Into::into)
+            }
             _ => unreachable!(),
         }
     }

@@ -31,7 +31,7 @@ pub use unbonding_purse::UnbondingPurse;
 pub mod gens {
     //! Re-exports all auction related sub-gens modules.
     pub use crate::system::auction::{
-        bid::gens::*, delegator::gens::*, era_info::gens::*, unbonding_purse::gens::*, 
+        bid::gens::*, delegator::gens::*, era_info::gens::*, unbonding_purse::gens::*,
     };
 }
 

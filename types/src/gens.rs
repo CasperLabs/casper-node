@@ -20,8 +20,7 @@ use crate::{
     transfer::TransferAddr,
     AccessRights, CLType, CLValue, Contract, ContractHash, ContractPackage, ContractVersionKey,
     ContractWasm, EntryPoint, EntryPointAccess, EntryPointType, EntryPoints, EraId, Group, Key,
-    NamedArg, NamedKey, Parameter, Phase, ProtocolVersion, SemVer, URef, U128, U256,
-    U512,
+    NamedArg, NamedKey, Parameter, Phase, ProtocolVersion, SemVer, URef, U128, U256, U512,
 };
 
 use crate::deploy_info::gens::{deploy_hash_arb, transfer_addr_arb};

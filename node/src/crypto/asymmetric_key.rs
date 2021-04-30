@@ -91,7 +91,7 @@ mod tests {
 
     use openssl::pkey::{PKey, Private, Public};
 
-    use casper_types::{bytesrepr, AsymmetricType, Tagged};
+    use casper_types::{bytesrepr, AsymmetricKeyTag, AsymmetricType, Tagged};
 
     use super::*;
     use crate::{crypto::AsymmetricKeyExt, testing::TestRng};
@@ -127,7 +127,11 @@ mod tests {
         SecretKey::from_pem(&pem_encoded[1..]).unwrap_err();
     }
 
-    fn known_secret_key_to_pem(expected_key: &SecretKey, known_key_pem: &str, expected_tag: u8) {
+    fn known_secret_key_to_pem(
+        expected_key: &SecretKey,
+        known_key_pem: &str,
+        expected_tag: AsymmetricKeyTag,
+    ) {
         let decoded = SecretKey::from_pem(known_key_pem.as_bytes()).unwrap();
         assert_secret_keys_equal(expected_key, &decoded);
         assert_eq!(expected_tag, decoded.tag());
@@ -267,7 +271,7 @@ mod tests {
     mod ed25519 {
         use rand::Rng;
 
-        use casper_types::ED25519_TAG;
+        use casper_types::AsymmetricKeyTag;
 
         use super::*;
         use crate::crypto::AsymmetricKeyExt;
@@ -315,7 +319,7 @@ MC4CAQAwBQYDK2VwBCIEINTuctv5E1hK1bbY8fdp+K06/nwoy/HU++CXqI9EdVhC
                 hex::decode("d4ee72dbf913584ad5b6d8f1f769f8ad3afe7c28cbf1d4fbe097a88f44755842")
                     .unwrap();
             let expected_key = SecretKey::ed25519_from_bytes(key_bytes).unwrap();
-            super::known_secret_key_to_pem(&expected_key, KNOWN_KEY_PEM, ED25519_TAG);
+            super::known_secret_key_to_pem(&expected_key, KNOWN_KEY_PEM, AsymmetricKeyTag::Ed25519);
         }
 
         #[test]
@@ -478,8 +482,6 @@ MCowBQYDK2VwAyEAGb9ECWmEzf6FQbrBZ9w7lshQhqowtrbLDFw4rXAxZuE=
     mod secp256k1 {
         use rand::Rng;
 
-        use casper_types::SECP256K1_TAG;
-
         use super::*;
         use crate::crypto::AsymmetricKeyExt;
 
@@ -526,7 +528,11 @@ Yj9oTB9fx9+vvQdxJOhMtu46kGo0Uw==
                 hex::decode("bddfa9a30a01f5d22b50f63e75556d9959ee34efd77de7ba4ab8fbde6cea499c")
                     .unwrap();
             let expected_key = SecretKey::secp256k1_from_bytes(key_bytes).unwrap();
-            super::known_secret_key_to_pem(&expected_key, KNOWN_KEY_PEM, SECP256K1_TAG);
+            super::known_secret_key_to_pem(
+                &expected_key,
+                KNOWN_KEY_PEM,
+                AsymmetricKeyTag::Secp256k1,
+            );
         }
 
         #[test]
