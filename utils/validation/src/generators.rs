@@ -16,9 +16,10 @@ use casper_types::{
     system::auction::{Bid, EraInfo, SeigniorageAllocation, UnbondingPurse},
     AccessRights, CLType, CLTyped, CLValue, Contract, ContractHash, ContractPackage,
     ContractPackageHash, ContractVersionKey, ContractWasm, ContractWasmHash, DeployHash,
-    DeployInfo, EntryPoint, EntryPointAccess, EntryPointType, EntryPoints, EraId, Group, Key,
-    NamedKey, Parameter, ProtocolVersion, PublicKey, SecretKey, Transfer, TransferAddr, Transform,
-    URef, U128, U256, U512,
+    DeployInfo, EntryPoint, EntryPointAccess, EntryPointType, EntryPoints, EraId, ExecutionEffect,
+    ExecutionResult, Group, Key, NamedKey, OpKind, Operation, Parameter, ProtocolVersion,
+    PublicKey, SecretKey, Transfer, TransferAddr, Transform, TransformEntry, URef, U128, U256,
+    U512,
 };
 use casper_validation::{
     abi::{ABIFixture, ABITestCase},
@@ -712,5 +713,78 @@ pub fn make_abi_test_fixtures() -> Result<TestFixtures, Error> {
         Fixture::ABI("clvalue".to_string(), ABIFixture::from(clvalue))
     };
 
-    Ok(vec![basic, transform, stored_value, clvalue])
+    let execution_result = {
+        let mut execution_result = BTreeMap::new();
+
+        let key_hash = Key::Hash([42; 32]);
+        let key_balance = Key::Balance([43; 32]);
+        let key_uref = Key::URef(URef::new([44; 32], AccessRights::READ_ADD_WRITE));
+        let key_account = Key::Account(AccountHash::new([123; 32]));
+
+        let effect = ExecutionEffect {
+            operations: vec![
+                Operation {
+                    key: key_hash.to_formatted_string(),
+                    kind: OpKind::Read,
+                },
+                Operation {
+                    key: key_balance.to_formatted_string(),
+                    kind: OpKind::Write,
+                },
+                Operation {
+                    key: key_uref.to_formatted_string(),
+                    kind: OpKind::Add,
+                },
+                Operation {
+                    key: key_account.to_formatted_string(),
+                    kind: OpKind::NoOp,
+                },
+            ],
+            transforms: vec![
+                TransformEntry {
+                    key: key_hash.to_formatted_string(),
+                    transform: Transform::WriteContractWasm,
+                },
+                TransformEntry {
+                    key: key_balance.to_formatted_string(),
+                    transform: Transform::AddUInt512(U512::one()),
+                },
+            ],
+        };
+
+        let success = ExecutionResult::Success {
+            effect,
+            transfers: vec![TransferAddr::new([100; 32]), TransferAddr::new([101; 32])],
+            cost: U512::from(2_500_020_000u64),
+        };
+
+        let failure = ExecutionResult::Failure {
+            effect: ExecutionEffect::default(),
+            transfers: Vec::new(),
+            cost: U512::from(2_500_000_000u64),
+            error_message: "Error message".to_string(),
+        };
+
+        execution_result.insert(
+            "Success".to_string(),
+            ABITestCase::from_inputs(vec![success.into()]).unwrap(),
+        );
+        execution_result.insert(
+            "Failure_NoEffects_NoTransfers".to_string(),
+            ABITestCase::from_inputs(vec![failure.into()]).unwrap(),
+        );
+
+        Fixture::ABI(
+            "execution_result".to_string(),
+            ABIFixture::from(execution_result),
+        )
+    };
+
+    Ok(vec![
+        basic,
+        transform,
+        stored_value,
+        clvalue,
+        execution_result,
+    ])
 }
