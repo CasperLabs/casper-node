@@ -21,18 +21,12 @@ impl From<&ExecutionEffect> for casper_types::ExecutionEffect {
             operations: effect
                 .ops
                 .iter()
-                .map(|(key, op)| casper_types::Operation {
-                    key: key.to_formatted_string(),
-                    kind: op.into(),
-                })
+                .map(|(key, op)| casper_types::Operation::new(*key, op.into()))
                 .collect(),
             transforms: effect
                 .transforms
                 .iter()
-                .map(|(key, transform)| casper_types::TransformEntry {
-                    key: key.to_formatted_string(),
-                    transform: transform.into(),
-                })
+                .map(|(key, transform)| casper_types::TransformEntry::new(*key, transform.into()))
                 .collect(),
         }
     }

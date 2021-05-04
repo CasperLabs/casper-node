@@ -34,18 +34,30 @@ use crate::{
     account::AccountHash,
     bytesrepr::{self, FromBytes, ToBytes, U8_SERIALIZED_LENGTH},
     system::auction::{Bid, EraInfo, UnbondingPurse},
-    CLValue, DeployInfo, NamedKey, Transfer, TransferAddr, U128, U256, U512,
+    CLValue, DeployInfo, Key, NamedKey, Transfer, TransferAddr, U128, U256, U512,
 };
 
 /// Constants to track ExecutionResult serialization.
-const EXECUTION_RESULT_FAILURE_TAG: u8 = 0;
-const EXECUTION_RESULT_SUCCESS_TAG: u8 = 1;
+#[derive(FromPrimitive, ToPrimitive)]
+#[repr(u8)]
+enum ExecutionResultTag {
+    Failure = 0,
+    Success = 1,
+}
 
-/// Constants to track operation serialization.
-const OP_READ_TAG: u8 = 0;
-const OP_WRITE_TAG: u8 = 1;
-const OP_ADD_TAG: u8 = 2;
-const OP_NOOP_TAG: u8 = 3;
+impl From<ExecutionResultTag> for u8 {
+    fn from(tag: ExecutionResultTag) -> Self {
+        tag.to_u8().unwrap()
+    }
+}
+
+impl FromBytes for ExecutionResultTag {
+    fn from_bytes(bytes: &[u8]) -> Result<(Self, &[u8]), bytesrepr::Error> {
+        let (tag_value, rem) = FromBytes::from_bytes(bytes)?;
+        let tag = ExecutionResultTag::from_u8(tag_value).ok_or(bytesrepr::Error::Formatting)?;
+        Ok((tag, rem))
+    }
+}
 
 /// Constants to track Transform serialization.
 #[derive(FromPrimitive, ToPrimitive)]
@@ -225,7 +237,7 @@ impl ToBytes for ExecutionResult {
                 cost,
                 error_message,
             } => {
-                buffer.push(EXECUTION_RESULT_FAILURE_TAG);
+                buffer.push(ExecutionResultTag::Failure.into());
                 buffer.extend(effect.to_bytes()?);
                 buffer.extend(transfers.to_bytes()?);
                 buffer.extend(cost.to_bytes()?);
@@ -236,7 +248,7 @@ impl ToBytes for ExecutionResult {
                 transfers,
                 cost,
             } => {
-                buffer.push(EXECUTION_RESULT_SUCCESS_TAG);
+                buffer.push(ExecutionResultTag::Success.into());
                 buffer.extend(effect.to_bytes()?);
                 buffer.extend(transfers.to_bytes()?);
                 buffer.extend(cost.to_bytes()?);
@@ -274,9 +286,9 @@ impl ToBytes for ExecutionResult {
 
 impl FromBytes for ExecutionResult {
     fn from_bytes(bytes: &[u8]) -> Result<(Self, &[u8]), bytesrepr::Error> {
-        let (tag, remainder) = u8::from_bytes(bytes)?;
+        let (tag, remainder) = ExecutionResultTag::from_bytes(bytes)?;
         match tag {
-            EXECUTION_RESULT_FAILURE_TAG => {
+            ExecutionResultTag::Failure => {
                 let (effect, remainder) = ExecutionEffect::from_bytes(remainder)?;
                 let (transfers, remainder) = Vec::<TransferAddr>::from_bytes(remainder)?;
                 let (cost, remainder) = U512::from_bytes(remainder)?;
@@ -289,7 +301,7 @@ impl FromBytes for ExecutionResult {
                 };
                 Ok((execution_result, remainder))
             }
-            EXECUTION_RESULT_SUCCESS_TAG => {
+            ExecutionResultTag::Success => {
                 let (effect, remainder) = ExecutionEffect::from_bytes(remainder)?;
                 let (transfers, remainder) = Vec::<TransferAddr>::from_bytes(remainder)?;
                 let (cost, remainder) = U512::from_bytes(remainder)?;
@@ -300,7 +312,6 @@ impl FromBytes for ExecutionResult {
                 };
                 Ok((execution_result, remainder))
             }
-            _ => Err(bytesrepr::Error::Formatting),
         }
     }
 }
@@ -347,9 +358,19 @@ impl FromBytes for ExecutionEffect {
 #[serde(deny_unknown_fields)]
 pub struct Operation {
     /// The formatted string of the `Key`.
-    pub key: String,
+    key: String,
     /// The type of operation.
-    pub kind: OpKind,
+    kind: OpKind,
+}
+
+impl Operation {
+    /// Creates new [`Operation`] based on a [`Key`] instance and kind of operation.
+    pub fn new(key: Key, kind: OpKind) -> Self {
+        Self {
+            key: key.to_formatted_string(),
+            kind,
+        }
+    }
 }
 
 impl ToBytes for Operation {
@@ -375,28 +396,24 @@ impl FromBytes for Operation {
 }
 
 /// The type of operation performed while executing a deploy.
-#[derive(Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Debug)]
+#[derive(Clone, Copy, Eq, PartialEq, Serialize, Deserialize, Debug, FromPrimitive, ToPrimitive)]
 #[cfg_attr(feature = "std", derive(JsonSchema))]
+#[repr(u8)]
 #[serde(deny_unknown_fields)]
 pub enum OpKind {
     /// A read operation.
-    Read,
+    Read = 0,
     /// A write operation.
-    Write,
+    Write = 1,
     /// An addition.
-    Add,
+    Add = 2,
     /// An operation which has no effect.
-    NoOp,
+    NoOp = 3,
 }
 
 impl ToBytes for OpKind {
     fn to_bytes(&self) -> Result<Vec<u8>, bytesrepr::Error> {
-        match self {
-            OpKind::Read => OP_READ_TAG.to_bytes(),
-            OpKind::Write => OP_WRITE_TAG.to_bytes(),
-            OpKind::Add => OP_ADD_TAG.to_bytes(),
-            OpKind::NoOp => OP_NOOP_TAG.to_bytes(),
-        }
+        self.to_u8().unwrap().to_bytes()
     }
 
     fn serialized_length(&self) -> usize {
@@ -407,13 +424,8 @@ impl ToBytes for OpKind {
 impl FromBytes for OpKind {
     fn from_bytes(bytes: &[u8]) -> Result<(Self, &[u8]), bytesrepr::Error> {
         let (tag, remainder) = u8::from_bytes(bytes)?;
-        match tag {
-            OP_READ_TAG => Ok((OpKind::Read, remainder)),
-            OP_WRITE_TAG => Ok((OpKind::Write, remainder)),
-            OP_ADD_TAG => Ok((OpKind::Add, remainder)),
-            OP_NOOP_TAG => Ok((OpKind::NoOp, remainder)),
-            _ => Err(bytesrepr::Error::Formatting),
-        }
+        let tag_value = OpKind::from_u8(tag).ok_or(bytesrepr::Error::Formatting)?;
+        Ok((tag_value, remainder))
     }
 }
 
@@ -423,9 +435,24 @@ impl FromBytes for OpKind {
 #[serde(deny_unknown_fields)]
 pub struct TransformEntry {
     /// The formatted string of the `Key`.
-    pub key: String,
+    key: String,
     /// The transformation.
-    pub transform: Transform,
+    transform: Transform,
+}
+
+impl TransformEntry {
+    /// Creates new [`TransformEntry`] based on a [`Key`] instance and a [`Transform`].
+    pub fn new(key: Key, transform: Transform) -> Self {
+        Self {
+            key: key.to_formatted_string(),
+            transform,
+        }
+    }
+
+    /// Returns transform instance.
+    pub fn transform(&self) -> &Transform {
+        &self.transform
+    }
 }
 
 impl ToBytes for TransformEntry {
@@ -694,10 +721,11 @@ pub(crate) mod gens {
     use crate::{
         deploy_info::gens::account_hash_arb,
         gens::{
-            cl_value_arb, deploy_info_arb, named_key_arb, transfer_arb, u128_arb, u256_arb,
-            u512_arb,
+            cl_value_arb, deploy_info_arb, key_arb, named_key_arb, transfer_arb, u128_arb,
+            u256_arb, u512_arb, u8_slice_32,
         },
         system::auction::gens::{bid_arb, era_info_arb, unbonding_purse_arb},
+        ExecutionEffect, ExecutionResult, OpKind, Operation, TransferAddr, TransformEntry,
     };
 
     use crate::Transform;
@@ -724,6 +752,90 @@ pub(crate) mod gens {
             "\\PC+".prop_map(Transform::Failure),
         ]
     }
+
+    pub fn op_kind_arb() -> impl Strategy<Value = OpKind> {
+        prop_oneof![
+            Just(OpKind::Read),
+            Just(OpKind::Write),
+            Just(OpKind::Add),
+            Just(OpKind::NoOp),
+        ]
+    }
+
+    prop_compose! {
+        pub fn operation_arb()(
+            key in key_arb(),
+            op_kind in op_kind_arb(),
+        ) -> Operation {
+            Operation::new(key, op_kind)
+        }
+    }
+
+    prop_compose! {
+        pub fn transform_entry_arb()(
+            key in key_arb(),
+            transform in transform_arb(),
+        ) -> TransformEntry {
+            TransformEntry::new(key, transform)
+        }
+    }
+
+    prop_compose! {
+        pub fn execution_effect_arb()(
+            operations in vec(operation_arb(), 1..10),
+            transforms in vec(transform_entry_arb(), 0..10),
+        ) -> ExecutionEffect {
+            ExecutionEffect {
+                operations, transforms
+            }
+        }
+    }
+
+    prop_compose! {
+        pub fn transfer_addr_arb()(
+            transfer_addr in u8_slice_32(),
+        ) -> TransferAddr {
+            TransferAddr::new(transfer_addr)
+        }
+    }
+
+    prop_compose! {
+        pub fn execution_result_failure_arb()(
+            effect in execution_effect_arb(),
+            transfers in vec(transfer_addr_arb(), 0..10),
+            cost in u512_arb(),
+            error_message in "\\PC+",
+        ) -> ExecutionResult {
+            ExecutionResult::Failure {
+                effect,
+                transfers,
+                cost,
+                error_message,
+            }
+        }
+    }
+
+    prop_compose! {
+        pub fn execution_result_success_arb()(
+            effect in execution_effect_arb(),
+            transfers in vec(transfer_addr_arb(), 0..10),
+            cost in u512_arb(),
+        ) -> ExecutionResult {
+            ExecutionResult::Success {
+                effect,
+                transfers,
+                cost,
+            }
+        }
+    }
+
+    /// Creates arbitrary [`ExecutionResult`].
+    pub fn execution_result_arb() -> impl Strategy<Value = ExecutionResult> {
+        prop_oneof![
+            execution_result_success_arb(),
+            execution_result_failure_arb(),
+        ]
+    }
 }
 
 #[cfg(test)]
@@ -736,8 +848,13 @@ mod tests {
 
     proptest! {
         #[test]
-        fn test_serialization_roundtrip(deploy_info in gens::transform_arb()) {
+        fn test_transform_serialization_roundtrip(deploy_info in gens::transform_arb()) {
             bytesrepr::test_serialization_roundtrip(&deploy_info)
+        }
+
+        #[test]
+        fn test_execution_result_serialization_roundtrip(execution_result in gens::execution_result_arb()) {
+            bytesrepr::test_serialization_roundtrip(&execution_result)
         }
     }
 }

@@ -723,32 +723,14 @@ pub fn make_abi_test_fixtures() -> Result<TestFixtures, Error> {
 
         let effect = ExecutionEffect {
             operations: vec![
-                Operation {
-                    key: key_hash.to_formatted_string(),
-                    kind: OpKind::Read,
-                },
-                Operation {
-                    key: key_balance.to_formatted_string(),
-                    kind: OpKind::Write,
-                },
-                Operation {
-                    key: key_uref.to_formatted_string(),
-                    kind: OpKind::Add,
-                },
-                Operation {
-                    key: key_account.to_formatted_string(),
-                    kind: OpKind::NoOp,
-                },
+                Operation::new(key_hash, OpKind::Read),
+                Operation::new(key_balance, OpKind::Write),
+                Operation::new(key_uref, OpKind::Add),
+                Operation::new(key_account, OpKind::NoOp),
             ],
             transforms: vec![
-                TransformEntry {
-                    key: key_hash.to_formatted_string(),
-                    transform: Transform::WriteContractWasm,
-                },
-                TransformEntry {
-                    key: key_balance.to_formatted_string(),
-                    transform: Transform::AddUInt512(U512::one()),
-                },
+                TransformEntry::new(key_hash, Transform::WriteContractWasm),
+                TransformEntry::new(key_balance, Transform::AddUInt512(U512::one())),
             ],
         };
 
