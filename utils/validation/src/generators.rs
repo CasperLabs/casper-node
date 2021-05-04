@@ -328,7 +328,7 @@ pub fn make_abi_test_fixtures() -> Result<TestFixtures, Error> {
         let entry_points = {
             let mut entry_points = EntryPoints::new();
             let public_contract_entry_point = EntryPoint::new(
-                "public_entry_point_func",
+                "public_contract_entry_point_func",
                 vec![
                     Parameter::new("param1", U512::cl_type()),
                     Parameter::new("param2", String::cl_type()),
@@ -339,6 +339,19 @@ pub fn make_abi_test_fixtures() -> Result<TestFixtures, Error> {
             );
 
             entry_points.add_entry_point(public_contract_entry_point);
+
+            let public_session_entry_point = EntryPoint::new(
+                "public_session_entry_point_func",
+                vec![
+                    Parameter::new("param1", U512::cl_type()),
+                    Parameter::new("param2", String::cl_type()),
+                ],
+                CLType::Unit,
+                EntryPointAccess::Public,
+                EntryPointType::Session,
+            );
+
+            entry_points.add_entry_point(public_session_entry_point);
 
             entry_points
         };
