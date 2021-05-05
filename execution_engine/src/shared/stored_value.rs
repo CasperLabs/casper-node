@@ -1,5 +1,7 @@
 use std::{convert::TryFrom, fmt::Debug};
 
+use num_derive::{FromPrimitive, ToPrimitive};
+use num_traits::{FromPrimitive, ToPrimitive};
 use serde::{de, ser, Deserialize, Deserializer, Serialize, Serializer};
 use serde_bytes::ByteBuf;
 
@@ -12,8 +14,9 @@ use casper_types::{
 
 use crate::shared::{account::Account, TypeMismatch};
 
+#[derive(FromPrimitive, ToPrimitive)]
 #[repr(u8)]
-enum Tag {
+enum StoredValueTag {
     CLValue = 0,
     Account = 1,
     ContractWasm = 2,
@@ -24,6 +27,20 @@ enum Tag {
     EraInfo = 7,
     Bid = 8,
     Withdraw = 9,
+}
+
+impl From<StoredValueTag> for u8 {
+    fn from(tag: StoredValueTag) -> Self {
+        tag.to_u8().expect("StoredValueTag is represented as u8")
+    }
+}
+
+impl FromBytes for StoredValueTag {
+    fn from_bytes(bytes: &[u8]) -> Result<(Self, &[u8]), bytesrepr::Error> {
+        let (tag_value, rem) = FromBytes::from_bytes(bytes)?;
+        let tag = StoredValueTag::from_u8(tag_value).ok_or(bytesrepr::Error::Formatting)?;
+        Ok((tag, rem))
+    }
 }
 
 #[derive(Eq, PartialEq, Clone, Debug)]
@@ -261,24 +278,29 @@ impl ToBytes for StoredValue {
     fn to_bytes(&self) -> Result<Vec<u8>, bytesrepr::Error> {
         let mut result = bytesrepr::allocate_buffer(self)?;
         let (tag, mut serialized_data) = match self {
-            StoredValue::CLValue(cl_value) => (Tag::CLValue, cl_value.to_bytes()?),
-            StoredValue::Account(account) => (Tag::Account, account.to_bytes()?),
+            StoredValue::CLValue(cl_value) => (StoredValueTag::CLValue, cl_value.to_bytes()?),
+            StoredValue::Account(account) => (StoredValueTag::Account, account.to_bytes()?),
             StoredValue::ContractWasm(contract_wasm) => {
-                (Tag::ContractWasm, contract_wasm.to_bytes()?)
+                (StoredValueTag::ContractWasm, contract_wasm.to_bytes()?)
             }
-            StoredValue::Contract(contract_header) => (Tag::Contract, contract_header.to_bytes()?),
-            StoredValue::ContractPackage(contract_package) => {
-                (Tag::ContractPackage, contract_package.to_bytes()?)
+            StoredValue::Contract(contract_header) => {
+                (StoredValueTag::Contract, contract_header.to_bytes()?)
             }
-            StoredValue::Transfer(transfer) => (Tag::Transfer, transfer.to_bytes()?),
-            StoredValue::DeployInfo(deploy_info) => (Tag::DeployInfo, deploy_info.to_bytes()?),
-            StoredValue::EraInfo(era_info) => (Tag::EraInfo, era_info.to_bytes()?),
-            StoredValue::Bid(bid) => (Tag::Bid, bid.to_bytes()?),
+            StoredValue::ContractPackage(contract_package) => (
+                StoredValueTag::ContractPackage,
+                contract_package.to_bytes()?,
+            ),
+            StoredValue::Transfer(transfer) => (StoredValueTag::Transfer, transfer.to_bytes()?),
+            StoredValue::DeployInfo(deploy_info) => {
+                (StoredValueTag::DeployInfo, deploy_info.to_bytes()?)
+            }
+            StoredValue::EraInfo(era_info) => (StoredValueTag::EraInfo, era_info.to_bytes()?),
+            StoredValue::Bid(bid) => (StoredValueTag::Bid, bid.to_bytes()?),
             StoredValue::Withdraw(unbonding_purses) => {
-                (Tag::Withdraw, unbonding_purses.to_bytes()?)
+                (StoredValueTag::Withdraw, unbonding_purses.to_bytes()?)
             }
         };
-        result.push(tag as u8);
+        result.push(tag.into());
         result.append(&mut serialized_data);
         Ok(result)
     }
@@ -304,38 +326,37 @@ impl ToBytes for StoredValue {
 
 impl FromBytes for StoredValue {
     fn from_bytes(bytes: &[u8]) -> Result<(Self, &[u8]), bytesrepr::Error> {
-        let (tag, remainder): (u8, &[u8]) = FromBytes::from_bytes(bytes)?;
+        let (tag, remainder) = StoredValueTag::from_bytes(bytes)?;
         match tag {
-            tag if tag == Tag::CLValue as u8 => CLValue::from_bytes(remainder)
+            StoredValueTag::CLValue => CLValue::from_bytes(remainder)
                 .map(|(cl_value, remainder)| (StoredValue::CLValue(cl_value), remainder)),
-            tag if tag == Tag::Account as u8 => Account::from_bytes(remainder)
+            StoredValueTag::Account => Account::from_bytes(remainder)
                 .map(|(account, remainder)| (StoredValue::Account(account), remainder)),
-            tag if tag == Tag::ContractWasm as u8 => {
+            StoredValueTag::ContractWasm => {
                 ContractWasm::from_bytes(remainder).map(|(contract_wasm, remainder)| {
                     (StoredValue::ContractWasm(contract_wasm), remainder)
                 })
             }
-            tag if tag == Tag::ContractPackage as u8 => {
+            StoredValueTag::ContractPackage => {
                 ContractPackage::from_bytes(remainder).map(|(contract_package, remainder)| {
                     (StoredValue::ContractPackage(contract_package), remainder)
                 })
             }
-            tag if tag == Tag::Contract as u8 => Contract::from_bytes(remainder)
+            StoredValueTag::Contract => Contract::from_bytes(remainder)
                 .map(|(contract, remainder)| (StoredValue::Contract(contract), remainder)),
-            tag if tag == Tag::Transfer as u8 => Transfer::from_bytes(remainder)
+            StoredValueTag::Transfer => Transfer::from_bytes(remainder)
                 .map(|(transfer, remainder)| (StoredValue::Transfer(transfer), remainder)),
-            tag if tag == Tag::DeployInfo as u8 => DeployInfo::from_bytes(remainder)
+            StoredValueTag::DeployInfo => DeployInfo::from_bytes(remainder)
                 .map(|(deploy_info, remainder)| (StoredValue::DeployInfo(deploy_info), remainder)),
-            tag if tag == Tag::EraInfo as u8 => EraInfo::from_bytes(remainder)
+            StoredValueTag::EraInfo => EraInfo::from_bytes(remainder)
                 .map(|(deploy_info, remainder)| (StoredValue::EraInfo(deploy_info), remainder)),
-            tag if tag == Tag::Bid as u8 => Bid::from_bytes(remainder)
+            StoredValueTag::Bid => Bid::from_bytes(remainder)
                 .map(|(bid, remainder)| (StoredValue::Bid(Box::new(bid)), remainder)),
-            tag if tag == Tag::Withdraw as u8 => {
+            StoredValueTag::Withdraw => {
                 Vec::<UnbondingPurse>::from_bytes(remainder).map(|(unbonding_purses, remainder)| {
                     (StoredValue::Withdraw(unbonding_purses), remainder)
                 })
             }
-            _ => Err(bytesrepr::Error::Formatting),
         }
     }
 }
