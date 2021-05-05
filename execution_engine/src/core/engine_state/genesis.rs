@@ -1,8 +1,9 @@
 use std::{cell::RefCell, collections::BTreeMap, fmt, iter, rc::Rc};
 
 use datasize::DataSize;
+use num_derive::{FromPrimitive, ToPrimitive};
 use num_rational::Ratio;
-use num_traits::Zero;
+use num_traits::{FromPrimitive, ToPrimitive, Zero};
 use parity_wasm::elements::Module;
 use rand::{
     distributions::{Distribution, Standard},
@@ -118,11 +119,26 @@ impl GenesisResult {
     }
 }
 
+#[derive(FromPrimitive, ToPrimitive)]
 #[repr(u8)]
 enum GenesisAccountTag {
     System = 0,
     Account = 1,
     Delegator = 2,
+}
+
+impl From<GenesisAccountTag> for u8 {
+    fn from(tag: GenesisAccountTag) -> Self {
+        tag.to_u8().expect("GenesisAccountTag is represented as u8")
+    }
+}
+
+impl FromBytes for GenesisAccountTag {
+    fn from_bytes(bytes: &[u8]) -> Result<(Self, &[u8]), bytesrepr::Error> {
+        let (tag_value, rem) = FromBytes::from_bytes(bytes)?;
+        let tag = GenesisAccountTag::from_u8(tag_value).ok_or(bytesrepr::Error::Formatting)?;
+        Ok((tag, rem))
+    }
 }
 
 #[derive(DataSize, Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -376,14 +392,14 @@ impl ToBytes for GenesisAccount {
         let mut buffer = bytesrepr::allocate_buffer(self)?;
         match self {
             GenesisAccount::System => {
-                buffer.push(GenesisAccountTag::System as u8);
+                buffer.push(GenesisAccountTag::System.into());
             }
             GenesisAccount::Account {
                 public_key,
                 balance,
                 validator,
             } => {
-                buffer.push(GenesisAccountTag::Account as u8);
+                buffer.push(GenesisAccountTag::Account.into());
                 buffer.extend(public_key.to_bytes()?);
                 buffer.extend(balance.value().to_bytes()?);
                 buffer.extend(validator.to_bytes()?);
@@ -394,7 +410,7 @@ impl ToBytes for GenesisAccount {
                 balance,
                 delegated_amount,
             } => {
-                buffer.push(GenesisAccountTag::Delegator as u8);
+                buffer.push(GenesisAccountTag::Delegator.into());
                 buffer.extend(validator_public_key.to_bytes()?);
                 buffer.extend(delegator_public_key.to_bytes()?);
                 buffer.extend(balance.value().to_bytes()?);
@@ -435,20 +451,20 @@ impl ToBytes for GenesisAccount {
 
 impl FromBytes for GenesisAccount {
     fn from_bytes(bytes: &[u8]) -> Result<(Self, &[u8]), bytesrepr::Error> {
-        let (tag, remainder) = u8::from_bytes(bytes)?;
+        let (tag, remainder) = GenesisAccountTag::from_bytes(bytes)?;
         match tag {
-            tag if tag == GenesisAccountTag::System as u8 => {
+            GenesisAccountTag::System => {
                 let genesis_account = GenesisAccount::system();
                 Ok((genesis_account, remainder))
             }
-            tag if tag == GenesisAccountTag::Account as u8 => {
+            GenesisAccountTag::Account => {
                 let (public_key, remainder) = FromBytes::from_bytes(remainder)?;
                 let (balance, remainder) = FromBytes::from_bytes(remainder)?;
                 let (validator, remainder) = FromBytes::from_bytes(remainder)?;
                 let genesis_account = GenesisAccount::account(public_key, balance, validator);
                 Ok((genesis_account, remainder))
             }
-            tag if tag == GenesisAccountTag::Delegator as u8 => {
+            GenesisAccountTag::Delegator => {
                 let (validator_public_key, remainder) = FromBytes::from_bytes(remainder)?;
                 let (delegator_public_key, remainder) = FromBytes::from_bytes(remainder)?;
                 let (balance, remainder) = FromBytes::from_bytes(remainder)?;
@@ -461,7 +477,6 @@ impl FromBytes for GenesisAccount {
                 );
                 Ok((genesis_account, remainder))
             }
-            _ => Err(bytesrepr::Error::Formatting),
         }
     }
 }
