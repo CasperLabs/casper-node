@@ -1,0 +1,165 @@
+{
+  "ModuleBytes": {
+    "input": [
+      {
+        "type": "ExecutableDeployItem",
+        "value": {
+          "ModuleBytes": {
+            "module_bytes": "0061736d010000000104016000000302010005030100010708010463616c6c00000a040102000b",
+            "args": [
+              [
+                "name",
+                {
+                  "cl_type": "String",
+                  "bytes": "040000004a6f686e",
+                  "parsed": "John"
+                }
+              ]
+            ]
+          }
+        }
+      }
+    ],
+    "output": "00270000000061736d010000000104016000000302010005030100010708010463616c6c00000a040102000b01000000040000006e616d6508000000040000004a6f686e0a"
+  },
+  "StoredContractByHash": {
+    "input": [
+      {
+        "type": "ExecutableDeployItem",
+        "value": {
+          "StoredContractByHash": {
+            "hash": "2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a",
+            "entry_point": "entry_point",
+            "args": [
+              [
+                "name",
+                {
+                  "cl_type": "String",
+                  "bytes": "040000004a6f686e",
+                  "parsed": "John"
+                }
+              ]
+            ]
+          }
+        }
+      }
+    ],
+    "output": "012a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a0b000000656e7472795f706f696e7401000000040000006e616d6508000000040000004a6f686e0a"
+  },
+  "StoredContractByName": {
+    "input": [
+      {
+        "type": "ExecutableDeployItem",
+        "value": {
+          "StoredContractByName": {
+            "name": "contract",
+            "entry_point": "entry_point",
+            "args": [
+              [
+                "name",
+                {
+                  "cl_type": "String",
+                  "bytes": "040000004a6f686e",
+                  "parsed": "John"
+                }
+              ]
+            ]
+          }
+        }
+      }
+    ],
+    "output": "0208000000636f6e74726163740b000000656e7472795f706f696e7401000000040000006e616d6508000000040000004a6f686e0a"
+  },
+  "StoredVersionedContractByHash": {
+    "input": [
+      {
+        "type": "ExecutableDeployItem",
+        "value": {
+          "StoredVersionedContractByHash": {
+            "hash": "2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a",
+            "version": 123,
+            "entry_point": "entry_point",
+            "args": [
+              [
+                "name",
+                {
+                  "cl_type": "String",
+                  "bytes": "040000004a6f686e",
+                  "parsed": "John"
+                }
+              ]
+            ]
+          }
+        }
+      }
+    ],
+    "output": "032a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a017b0000000b000000656e7472795f706f696e7401000000040000006e616d6508000000040000004a6f686e0a"
+  },
+  "StoredVersionedContractByName": {
+    "input": [
+      {
+        "type": "ExecutableDeployItem",
+        "value": {
+          "StoredVersionedContractByName": {
+            "name": "contract_package",
+            "version": null,
+            "entry_point": "entry_point",
+            "args": [
+              [
+                "name",
+                {
+                  "cl_type": "String",
+                  "bytes": "040000004a6f686e",
+                  "parsed": "John"
+                }
+              ]
+            ]
+          }
+        }
+      }
+    ],
+    "output": "0410000000636f6e74726163745f7061636b616765000b000000656e7472795f706f696e7401000000040000006e616d6508000000040000004a6f686e0a"
+  },
+  "Transfer": {
+    "input": [
+      {
+        "type": "ExecutableDeployItem",
+        "value": {
+          "Transfer": {
+            "args": [
+              [
+                "target",
+                {
+                  "cl_type": {
+                    "ByteArray": 32
+                  },
+                  "bytes": "6363636363636363636363636363636363636363636363636363636363636363",
+                  "parsed": "6363636363636363636363636363636363636363636363636363636363636363"
+                }
+              ],
+              [
+                "amount",
+                {
+                  "cl_type": "U512",
+                  "bytes": "0400f90295",
+                  "parsed": "2500000000"
+                }
+              ],
+              [
+                "id",
+                {
+                  "cl_type": {
+                    "Option": "I32"
+                  },
+                  "bytes": "017b000000",
+                  "parsed": 123
+                }
+              ]
+            ]
+          }
+        }
+      }
+    ],
+    "output": "0503000000060000007461726765742000000063636363636363636363636363636363636363636363636363636363636363630f2000000006000000616d6f756e74050000000400f902950802000000696405000000017b0000000d01"
+  }
+}

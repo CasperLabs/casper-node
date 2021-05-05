@@ -10,7 +10,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bytesrepr::{self, U8_SERIALIZED_LENGTH, FromBytes, ToBytes},
+    bytesrepr::{self, FromBytes, ToBytes, U8_SERIALIZED_LENGTH},
     CLType, CLTyped, PublicKey, Tagged, U512,
 };
 

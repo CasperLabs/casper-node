@@ -5,21 +5,29 @@ use std::{
 
 use num_traits::Zero;
 
-use casper_execution_engine::shared::{
-    account::{Account, ActionThresholds, AssociatedKeys},
-    stored_value::StoredValue,
-    wasm,
+use casper_execution_engine::{
+    core::engine_state::ExecutableDeployItem,
+    shared::{
+        account::{Account, ActionThresholds, AssociatedKeys},
+        stored_value::StoredValue,
+        wasm,
+    },
 };
 use casper_types::{
     account::{AccountHash, Weight},
+    bytesrepr::Bytes,
     contracts::{ContractPackageStatus, ContractVersions, DisabledVersions, Groups, NamedKeys},
-    system::auction::{Bid, EraInfo, SeigniorageAllocation, UnbondingPurse},
+    runtime_args,
+    system::{
+        auction::{Bid, EraInfo, SeigniorageAllocation, UnbondingPurse},
+        mint,
+    },
     AccessRights, CLType, CLTyped, CLValue, Contract, ContractHash, ContractPackage,
     ContractPackageHash, ContractVersionKey, ContractWasm, ContractWasmHash, DeployHash,
     DeployInfo, EntryPoint, EntryPointAccess, EntryPointType, EntryPoints, EraId, ExecutionEffect,
     ExecutionResult, Group, Key, NamedKey, OpKind, Operation, Parameter, ProtocolVersion,
-    PublicKey, SecretKey, Transfer, TransferAddr, Transform, TransformEntry, URef, U128, U256,
-    U512,
+    PublicKey, RuntimeArgs, SecretKey, Transfer, TransferAddr, Transform, TransformEntry, URef,
+    U128, U256, U512,
 };
 use casper_validation::{
     abi::{ABIFixture, ABITestCase},
@@ -95,6 +103,7 @@ pub fn make_abi_test_fixtures() -> Result<TestFixtures, Error> {
             "SerializeBool".to_string(),
             ABITestCase::from_inputs(vec![true.into(), false.into()])?,
         );
+
         Fixture::ABI("basic".to_string(), ABIFixture::from(basic))
     };
 
@@ -775,11 +784,92 @@ pub fn make_abi_test_fixtures() -> Result<TestFixtures, Error> {
         )
     };
 
+    let non_empty_args = runtime_args! {
+        "name" => String::from("John"),
+    };
+
+    let contract_hash = ContractHash::new([42; 32]);
+    let contract_package_hash = ContractPackageHash::new([42; 32]);
+    const ENTRY_POINT: &str = "entry_point";
+    const CONTRACT_NAME: &str = "contract";
+    const CONTRACT_PACKAGE_NAME: &str = "contract_package";
+
+    const ACCOUNT_ADDR: AccountHash = AccountHash::new([99; 32]);
+
+    let transfer_args = runtime_args! {
+        mint::ARG_TARGET => ACCOUNT_ADDR,
+        mint::ARG_AMOUNT => U512::from(2_500_000_000u64),
+        mint::ARG_ID => Some(123),
+    };
+
+    let executable_deploy_item = {
+        let mut executable_deploy_item = BTreeMap::new();
+        let item = ExecutableDeployItem::ModuleBytes {
+            module_bytes: Bytes::from(wasm::do_nothing_bytes()),
+            args: non_empty_args.clone(),
+        };
+        executable_deploy_item.insert(
+            "ModuleBytes".to_string(),
+            ABITestCase::from_inputs(vec![item.into()]).unwrap(),
+        );
+        let item = ExecutableDeployItem::StoredContractByHash {
+            hash: contract_hash,
+            entry_point: ENTRY_POINT.to_string(),
+            args: non_empty_args.clone(),
+        };
+        executable_deploy_item.insert(
+            "StoredContractByHash".to_string(),
+            ABITestCase::from_inputs(vec![item.into()]).unwrap(),
+        );
+        let item = ExecutableDeployItem::StoredContractByName {
+            name: CONTRACT_NAME.to_string(),
+            entry_point: ENTRY_POINT.to_string(),
+            args: non_empty_args.clone(),
+        };
+        executable_deploy_item.insert(
+            "StoredContractByName".to_string(),
+            ABITestCase::from_inputs(vec![item.into()]).unwrap(),
+        );
+        let item = ExecutableDeployItem::StoredVersionedContractByHash {
+            hash: contract_package_hash,
+            version: Some(123),
+            entry_point: ENTRY_POINT.to_string(),
+            args: non_empty_args.clone(),
+        };
+        executable_deploy_item.insert(
+            "StoredVersionedContractByHash".to_string(),
+            ABITestCase::from_inputs(vec![item.into()]).unwrap(),
+        );
+        let item = ExecutableDeployItem::StoredVersionedContractByName {
+            name: CONTRACT_PACKAGE_NAME.to_string(),
+            version: None,
+            entry_point: ENTRY_POINT.to_string(),
+            args: non_empty_args,
+        };
+        executable_deploy_item.insert(
+            "StoredVersionedContractByName".to_string(),
+            ABITestCase::from_inputs(vec![item.into()]).unwrap(),
+        );
+        let item = ExecutableDeployItem::Transfer {
+            args: transfer_args,
+        };
+        executable_deploy_item.insert(
+            "Transfer".to_string(),
+            ABITestCase::from_inputs(vec![item.into()]).unwrap(),
+        );
+
+        Fixture::ABI(
+            "executable_deploy_item".to_string(),
+            ABIFixture::from(executable_deploy_item),
+        )
+    };
+
     Ok(vec![
         basic,
         transform,
         stored_value,
         clvalue,
         execution_result,
+        executable_deploy_item,
     ])
 }
