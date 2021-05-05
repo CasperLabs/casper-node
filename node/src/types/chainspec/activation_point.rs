@@ -4,6 +4,8 @@
 use std::fmt::{self, Display, Formatter};
 
 use datasize::DataSize;
+use num_derive::{FromPrimitive, ToPrimitive};
+use num_traits::{FromPrimitive, ToPrimitive};
 #[cfg(test)]
 use rand::Rng;
 use schemars::JsonSchema;
@@ -18,8 +20,27 @@ use casper_types::{
 use crate::testing::TestRng;
 use crate::types::Timestamp;
 
-const ERA_ID_TAG: u8 = 0;
-const GENESIS_TAG: u8 = 1;
+#[derive(FromPrimitive, ToPrimitive)]
+#[repr(u8)]
+enum ActivationPointTag {
+    EraId = 0,
+    Genesis = 1,
+}
+
+impl From<ActivationPointTag> for u8 {
+    fn from(tag: ActivationPointTag) -> Self {
+        tag.to_u8()
+            .expect("ActivationPointTag is represented as u8")
+    }
+}
+
+impl FromBytes for ActivationPointTag {
+    fn from_bytes(bytes: &[u8]) -> Result<(Self, &[u8]), bytesrepr::Error> {
+        let (tag_value, rem) = FromBytes::from_bytes(bytes)?;
+        let tag = ActivationPointTag::from_u8(tag_value).ok_or(bytesrepr::Error::Formatting)?;
+        Ok((tag, rem))
+    }
+}
 
 /// The first era to which the associated protocol version applies.
 #[derive(Copy, Clone, DataSize, PartialEq, Eq, Serialize, Deserialize, Debug, JsonSchema)]
@@ -79,12 +100,12 @@ impl ToBytes for ActivationPoint {
     fn to_bytes(&self) -> Result<Vec<u8>, bytesrepr::Error> {
         match self {
             ActivationPoint::EraId(era_id) => {
-                let mut buffer = vec![ERA_ID_TAG];
+                let mut buffer = vec![ActivationPointTag::EraId.into()];
                 buffer.extend(era_id.to_bytes()?);
                 Ok(buffer)
             }
             ActivationPoint::Genesis(timestamp) => {
-                let mut buffer = vec![GENESIS_TAG];
+                let mut buffer = vec![ActivationPointTag::Genesis.into()];
                 buffer.extend(timestamp.to_bytes()?);
                 Ok(buffer)
             }
@@ -102,17 +123,16 @@ impl ToBytes for ActivationPoint {
 
 impl FromBytes for ActivationPoint {
     fn from_bytes(bytes: &[u8]) -> Result<(Self, &[u8]), bytesrepr::Error> {
-        let (tag, remainder) = u8::from_bytes(bytes)?;
+        let (tag, remainder) = ActivationPointTag::from_bytes(bytes)?;
         match tag {
-            ERA_ID_TAG => {
+            ActivationPointTag::EraId => {
                 let (era_id, remainder) = EraId::from_bytes(remainder)?;
                 Ok((ActivationPoint::EraId(era_id), remainder))
             }
-            GENESIS_TAG => {
+            ActivationPointTag::Genesis => {
                 let (timestamp, remainder) = Timestamp::from_bytes(remainder)?;
                 Ok((ActivationPoint::Genesis(timestamp), remainder))
             }
-            _ => Err(bytesrepr::Error::Formatting),
         }
     }
 }
