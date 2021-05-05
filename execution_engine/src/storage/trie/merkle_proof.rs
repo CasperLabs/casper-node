@@ -1,5 +1,9 @@
 use std::collections::VecDeque;
 
+use bytesrepr::U8_SERIALIZED_LENGTH;
+use num_derive::{FromPrimitive, ToPrimitive};
+use num_traits::{FromPrimitive, ToPrimitive};
+
 use casper_types::bytesrepr::{self, Bytes, FromBytes, ToBytes};
 
 use crate::{
@@ -7,8 +11,27 @@ use crate::{
     storage::trie::{Pointer, Trie, RADIX},
 };
 
-const TRIE_MERKLE_PROOF_STEP_NODE_ID: u8 = 0;
-const TRIE_MERKLE_PROOF_STEP_EXTENSION_ID: u8 = 1;
+#[derive(FromPrimitive, ToPrimitive)]
+#[repr(u8)]
+enum TrieMerkleProofStepTag {
+    Node = 0,
+    Extension = 1,
+}
+
+impl From<TrieMerkleProofStepTag> for u8 {
+    fn from(tag: TrieMerkleProofStepTag) -> Self {
+        tag.to_u8()
+            .expect("TrieMerkleProofStepTag is represented as u8")
+    }
+}
+
+impl FromBytes for TrieMerkleProofStepTag {
+    fn from_bytes(bytes: &[u8]) -> Result<(Self, &[u8]), bytesrepr::Error> {
+        let (tag_value, rem) = FromBytes::from_bytes(bytes)?;
+        let tag = TrieMerkleProofStepTag::from_u8(tag_value).ok_or(bytesrepr::Error::Formatting)?;
+        Ok((tag, rem))
+    }
+}
 
 /// A component of a proof that an entry exists in the Merkle trie.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -47,12 +70,12 @@ impl ToBytes for TrieMerkleProofStep {
                 hole_index,
                 indexed_pointers_with_hole,
             } => {
-                ret.push(TRIE_MERKLE_PROOF_STEP_NODE_ID);
+                ret.push(TrieMerkleProofStepTag::Node.into());
                 ret.push(*hole_index);
                 ret.append(&mut indexed_pointers_with_hole.to_bytes()?)
             }
             TrieMerkleProofStep::Extension { affix } => {
-                ret.push(TRIE_MERKLE_PROOF_STEP_EXTENSION_ID);
+                ret.push(TrieMerkleProofStepTag::Extension.into());
                 ret.append(&mut affix.to_bytes()?)
             }
         };
@@ -60,7 +83,7 @@ impl ToBytes for TrieMerkleProofStep {
     }
 
     fn serialized_length(&self) -> usize {
-        std::mem::size_of::<u8>()
+        U8_SERIALIZED_LENGTH
             + match self {
                 TrieMerkleProofStep::Node {
                     hole_index,
@@ -76,9 +99,9 @@ impl ToBytes for TrieMerkleProofStep {
 
 impl FromBytes for TrieMerkleProofStep {
     fn from_bytes(bytes: &[u8]) -> Result<(Self, &[u8]), bytesrepr::Error> {
-        let (tag, rem): (u8, &[u8]) = FromBytes::from_bytes(bytes)?;
+        let (tag, rem) = TrieMerkleProofStepTag::from_bytes(bytes)?;
         match tag {
-            TRIE_MERKLE_PROOF_STEP_NODE_ID => {
+            TrieMerkleProofStepTag::Node => {
                 let (hole_index, rem): (u8, &[u8]) = FromBytes::from_bytes(rem)?;
                 let (indexed_pointers_with_hole, rem): (Vec<(u8, Pointer)>, &[u8]) =
                     FromBytes::from_bytes(rem)?;
@@ -90,11 +113,10 @@ impl FromBytes for TrieMerkleProofStep {
                     rem,
                 ))
             }
-            TRIE_MERKLE_PROOF_STEP_EXTENSION_ID => {
+            TrieMerkleProofStepTag::Extension => {
                 let (affix, rem): (_, &[u8]) = FromBytes::from_bytes(rem)?;
                 Ok((TrieMerkleProofStep::Extension { affix }, rem))
             }
-            _ => Err(bytesrepr::Error::Formatting),
         }
     }
 }

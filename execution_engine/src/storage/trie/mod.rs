@@ -6,6 +6,8 @@ use std::{
     mem::MaybeUninit,
 };
 
+use num_derive::{FromPrimitive, ToPrimitive};
+use num_traits::{FromPrimitive, ToPrimitive};
 use serde::{
     de::{self, MapAccess, Visitor},
     ser::SerializeMap,
@@ -13,7 +15,10 @@ use serde::{
 };
 
 use crate::shared::newtypes::Blake2bHash;
-use casper_types::bytesrepr::{self, Bytes, FromBytes, ToBytes, U8_SERIALIZED_LENGTH};
+use casper_types::{
+    bytesrepr::{self, Bytes, FromBytes, ToBytes, U8_SERIALIZED_LENGTH},
+    Tagged,
+};
 
 #[cfg(test)]
 pub mod gens;
@@ -27,6 +32,26 @@ pub const RADIX: usize = 256;
 
 /// A parent is represented as a pair of a child index and a node or extension.
 pub type Parents<K, V> = Vec<(u8, Trie<K, V>)>;
+
+#[derive(FromPrimitive, ToPrimitive)]
+pub enum PointerTag {
+    LeafPointer = 0,
+    NodePointer = 1,
+}
+
+impl From<PointerTag> for u8 {
+    fn from(tag: PointerTag) -> Self {
+        tag.to_u8().expect("PointerTag is represented as u8")
+    }
+}
+
+impl FromBytes for PointerTag {
+    fn from_bytes(bytes: &[u8]) -> Result<(Self, &[u8]), bytesrepr::Error> {
+        let (tag_value, rem) = FromBytes::from_bytes(bytes)?;
+        let tag = PointerTag::from_u8(tag_value).ok_or(bytesrepr::Error::Formatting)?;
+        Ok((tag, rem))
+    }
+}
 
 /// Represents a pointer to the next object in a Merkle Trie
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -56,11 +81,15 @@ impl Pointer {
             Pointer::NodePointer(_) => Pointer::NodePointer(hash),
         }
     }
+}
 
-    fn tag(&self) -> u8 {
+impl Tagged for Pointer {
+    type Tag = PointerTag;
+
+    fn tag(&self) -> Self::Tag {
         match self {
-            Pointer::LeafPointer(_) => 0,
-            Pointer::NodePointer(_) => 1,
+            Pointer::LeafPointer(_) => PointerTag::LeafPointer,
+            Pointer::NodePointer(_) => PointerTag::NodePointer,
         }
     }
 }
@@ -68,7 +97,7 @@ impl Pointer {
 impl ToBytes for Pointer {
     fn to_bytes(&self) -> Result<Vec<u8>, bytesrepr::Error> {
         let mut ret = bytesrepr::unchecked_allocate_buffer(self);
-        ret.push(self.tag());
+        ret.push(self.tag().into());
         ret.extend_from_slice(self.hash().as_ref());
         Ok(ret)
     }
@@ -81,17 +110,16 @@ impl ToBytes for Pointer {
 
 impl FromBytes for Pointer {
     fn from_bytes(bytes: &[u8]) -> Result<(Self, &[u8]), bytesrepr::Error> {
-        let (tag, rem) = u8::from_bytes(bytes)?;
+        let (tag, rem) = PointerTag::from_bytes(bytes)?;
         match tag {
-            0 => {
+            PointerTag::LeafPointer => {
                 let (hash, rem) = Blake2bHash::from_bytes(rem)?;
                 Ok((Pointer::LeafPointer(hash), rem))
             }
-            1 => {
+            PointerTag::NodePointer => {
                 let (hash, rem) = Blake2bHash::from_bytes(rem)?;
                 Ok((Pointer::NodePointer(hash), rem))
             }
-            _ => Err(bytesrepr::Error::Formatting),
         }
     }
 }
