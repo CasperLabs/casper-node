@@ -486,45 +486,44 @@ impl ToBytes for Key {
 
 impl FromBytes for Key {
     fn from_bytes(bytes: &[u8]) -> Result<(Self, &[u8]), Error> {
-        let (tag, remainder) = u8::from_bytes(bytes)?;
+        let (tag, remainder) = KeyTag::from_bytes(bytes)?;
         match tag {
-            tag if tag == KeyTag::Account as u8 => {
+            KeyTag::Account => {
                 let (account_hash, rem) = AccountHash::from_bytes(remainder)?;
                 Ok((Key::Account(account_hash), rem))
             }
-            tag if tag == KeyTag::Hash as u8 => {
+            KeyTag::Hash => {
                 let (hash, rem) = FromBytes::from_bytes(remainder)?;
                 Ok((Key::Hash(hash), rem))
             }
-            tag if tag == KeyTag::URef as u8 => {
+            KeyTag::URef => {
                 let (uref, rem) = URef::from_bytes(remainder)?;
                 Ok((Key::URef(uref), rem))
             }
-            tag if tag == KeyTag::Transfer as u8 => {
+            KeyTag::Transfer => {
                 let (transfer_addr, rem) = TransferAddr::from_bytes(remainder)?;
                 Ok((Key::Transfer(transfer_addr), rem))
             }
-            tag if tag == KeyTag::DeployInfo as u8 => {
+            KeyTag::DeployInfo => {
                 let (deploy_hash, rem) = FromBytes::from_bytes(remainder)?;
                 Ok((Key::DeployInfo(deploy_hash), rem))
             }
-            tag if tag == KeyTag::EraInfo as u8 => {
+            KeyTag::EraInfo => {
                 let (era_id, rem) = FromBytes::from_bytes(remainder)?;
                 Ok((Key::EraInfo(era_id), rem))
             }
-            tag if tag == KeyTag::Balance as u8 => {
+            KeyTag::Balance => {
                 let (uref_addr, rem) = URefAddr::from_bytes(remainder)?;
                 Ok((Key::Balance(uref_addr), rem))
             }
-            tag if tag == KeyTag::Bid as u8 => {
+            KeyTag::Bid => {
                 let (account_hash, rem) = AccountHash::from_bytes(remainder)?;
                 Ok((Key::Bid(account_hash), rem))
             }
-            tag if tag == KeyTag::Withdraw as u8 => {
+            KeyTag::Withdraw => {
                 let (account_hash, rem) = AccountHash::from_bytes(remainder)?;
                 Ok((Key::Withdraw(account_hash), rem))
             }
-            _ => Err(Error::Formatting),
         }
     }
 }
