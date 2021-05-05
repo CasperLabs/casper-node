@@ -82,8 +82,7 @@ pub enum KeyTag {
 
 impl From<KeyTag> for u8 {
     fn from(key_tag: KeyTag) -> Self {
-        // NOTE: Considered safe safe as `KeyTag` is annotated with `repr(u8)`
-        key_tag.to_u8().unwrap()
+        key_tag.to_u8().expect("KeyTag is represented as u8")
     }
 }
 

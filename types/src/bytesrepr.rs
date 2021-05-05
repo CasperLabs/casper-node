@@ -15,8 +15,10 @@ use alloc::{
 use core::any;
 use core::{mem, ptr::NonNull};
 
+use num_derive::{FromPrimitive, ToPrimitive};
 use num_integer::Integer;
 use num_rational::Ratio;
+use num_traits::{FromPrimitive, ToPrimitive};
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use thiserror::Error;
@@ -45,14 +47,30 @@ pub const U128_SERIALIZED_LENGTH: usize = mem::size_of::<u128>();
 pub const U256_SERIALIZED_LENGTH: usize = U128_SERIALIZED_LENGTH * 2;
 /// The number of bytes in a serialized [`U512`](crate::U512).
 pub const U512_SERIALIZED_LENGTH: usize = U256_SERIALIZED_LENGTH * 2;
-/// The tag representing a `None` value.
-pub const OPTION_NONE_TAG: u8 = 0;
-/// The tag representing a `Some` value.
-pub const OPTION_SOME_TAG: u8 = 1;
-/// The tag representing an `Err` value.
-pub const RESULT_ERR_TAG: u8 = 0;
-/// The tag representing an `Ok` value.
-pub const RESULT_OK_TAG: u8 = 1;
+
+/// Enum representing serialization tags of a general purpose sum type with two cases.
+#[derive(FromPrimitive, ToPrimitive)]
+#[repr(u8)]
+pub(crate) enum EitherTag {
+    /// Example values: Option::None, or Result::Err
+    Left = 0,
+    /// Example values: Option::Some, or Result::Ok
+    Right = 1,
+}
+
+impl From<EitherTag> for u8 {
+    fn from(union_tag: EitherTag) -> Self {
+        union_tag.to_u8().expect("EitherTag is represented as u8")
+    }
+}
+
+impl FromBytes for EitherTag {
+    fn from_bytes(bytes: &[u8]) -> Result<(Self, &[u8]), Error> {
+        let (tag, rem) = FromBytes::from_bytes(bytes)?;
+        let union_tag = EitherTag::from_u8(tag).ok_or(Error::Formatting)?;
+        Ok((union_tag, rem))
+    }
+}
 
 /// A type which can be serialized to a `Vec<u8>`.
 pub trait ToBytes {
@@ -556,10 +574,10 @@ where
 impl<T: ToBytes> ToBytes for Option<T> {
     fn to_bytes(&self) -> Result<Vec<u8>, Error> {
         match self {
-            None => Ok(vec![OPTION_NONE_TAG]),
+            None => Ok(vec![EitherTag::Left.into()]),
             Some(v) => {
                 let mut result = allocate_buffer(self)?;
-                result.push(OPTION_SOME_TAG);
+                result.push(EitherTag::Right.into());
 
                 let mut value = v.to_bytes()?;
                 result.append(&mut value);
@@ -580,14 +598,13 @@ impl<T: ToBytes> ToBytes for Option<T> {
 
 impl<T: FromBytes> FromBytes for Option<T> {
     fn from_bytes(bytes: &[u8]) -> Result<(Self, &[u8]), Error> {
-        let (tag, rem) = u8::from_bytes(bytes)?;
+        let (tag, rem) = EitherTag::from_bytes(bytes)?;
         match tag {
-            OPTION_NONE_TAG => Ok((None, rem)),
-            OPTION_SOME_TAG => {
+            EitherTag::Left => Ok((None, rem)),
+            EitherTag::Right => {
                 let (t, rem) = T::from_bytes(rem)?;
                 Ok((Some(t), rem))
             }
-            _ => Err(Error::Formatting),
         }
     }
 }
@@ -596,10 +613,10 @@ impl<T: ToBytes, E: ToBytes> ToBytes for Result<T, E> {
     fn to_bytes(&self) -> Result<Vec<u8>, Error> {
         let mut result = allocate_buffer(self)?;
         let (variant, mut value) = match self {
-            Err(error) => (RESULT_ERR_TAG, error.to_bytes()?),
-            Ok(result) => (RESULT_OK_TAG, result.to_bytes()?),
+            Err(error) => (EitherTag::Left, error.to_bytes()?),
+            Ok(result) => (EitherTag::Right, result.to_bytes()?),
         };
-        result.push(variant);
+        result.push(variant.into());
         result.append(&mut value);
         Ok(result)
     }
@@ -615,17 +632,16 @@ impl<T: ToBytes, E: ToBytes> ToBytes for Result<T, E> {
 
 impl<T: FromBytes, E: FromBytes> FromBytes for Result<T, E> {
     fn from_bytes(bytes: &[u8]) -> Result<(Self, &[u8]), Error> {
-        let (variant, rem) = u8::from_bytes(bytes)?;
+        let (variant, rem) = EitherTag::from_bytes(bytes)?;
         match variant {
-            RESULT_ERR_TAG => {
+            EitherTag::Left => {
                 let (value, rem) = E::from_bytes(rem)?;
                 Ok((Err(value), rem))
             }
-            RESULT_OK_TAG => {
+            EitherTag::Right => {
                 let (value, rem) = T::from_bytes(rem)?;
                 Ok((Ok(value), rem))
             }
-            _ => Err(Error::Formatting),
         }
     }
 }

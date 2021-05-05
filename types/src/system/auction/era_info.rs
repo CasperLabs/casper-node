@@ -10,7 +10,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    bytesrepr::{self, FromBytes, ToBytes},
+    bytesrepr::{self, U8_SERIALIZED_LENGTH, FromBytes, ToBytes},
     CLType, CLTyped, PublicKey, Tagged, U512,
 };
 
@@ -23,11 +23,13 @@ pub enum SeigniorageAllocationTag {
 
 impl ToBytes for SeigniorageAllocationTag {
     fn to_bytes(&self) -> Result<Vec<u8>, bytesrepr::Error> {
-        self.to_u8().unwrap().to_bytes()
+        self.to_u8()
+            .expect("SeigniorageAllocationTag is serialized as u8")
+            .to_bytes()
     }
 
     fn serialized_length(&self) -> usize {
-        self.to_u8().unwrap().serialized_length()
+        U8_SERIALIZED_LENGTH
     }
 }
 

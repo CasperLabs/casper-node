@@ -51,7 +51,7 @@ enum CLTypeTag {
 
 impl From<CLTypeTag> for u8 {
     fn from(tag: CLTypeTag) -> Self {
-        tag.to_u8().unwrap()
+        tag.to_u8().expect("CLTypeTag is represented as u8")
     }
 }
 

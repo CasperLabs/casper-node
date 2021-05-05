@@ -4,7 +4,7 @@ use serde::Serialize;
 use serde_json::{json, Value};
 
 use crate::{
-    bytesrepr::{self, FromBytes, OPTION_NONE_TAG, OPTION_SOME_TAG, RESULT_ERR_TAG, RESULT_OK_TAG},
+    bytesrepr::{self, EitherTag, FromBytes},
     CLType, CLValue, Key, PublicKey, URef, U128, U256, U512,
 };
 
@@ -36,11 +36,10 @@ fn to_json<'a>(cl_type: &CLType, bytes: &'a [u8]) -> Option<(Value, &'a [u8])> {
         CLType::URef => simple_type_to_json::<URef>(bytes),
         CLType::PublicKey => simple_type_to_json::<PublicKey>(bytes),
         CLType::Option(inner_cl_type) => {
-            let (variant, remainder) = u8::from_bytes(bytes).ok()?;
+            let (variant, remainder) = EitherTag::from_bytes(bytes).ok()?;
             match variant {
-                OPTION_NONE_TAG => Some((Value::Null, remainder)),
-                OPTION_SOME_TAG => Some(to_json(inner_cl_type, remainder)?),
-                _ => None,
+                EitherTag::Left => Some((Value::Null, remainder)),
+                EitherTag::Right => Some(to_json(inner_cl_type, remainder)?),
             }
         }
         CLType::List(inner_cl_type) => {
@@ -58,17 +57,16 @@ fn to_json<'a>(cl_type: &CLType, bytes: &'a [u8]) -> Option<(Value, &'a [u8])> {
             Some((json![hex::encode(bytes)], remainder))
         }
         CLType::Result { ok, err } => {
-            let (variant, remainder) = u8::from_bytes(bytes).ok()?;
+            let (variant, remainder) = EitherTag::from_bytes(bytes).ok()?;
             match variant {
-                RESULT_ERR_TAG => {
+                EitherTag::Left => {
                     let (value, remainder) = to_json(err, remainder)?;
                     Some((json!({ "Err": value }), remainder))
                 }
-                RESULT_OK_TAG => {
+                EitherTag::Right => {
                     let (value, remainder) = to_json(ok, remainder)?;
                     Some((json!({ "Ok": value }), remainder))
                 }
-                _ => None,
             }
         }
         CLType::Map { key, value } => {

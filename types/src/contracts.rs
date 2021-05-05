@@ -24,7 +24,7 @@ use serde::{de::Error as SerdeError, Deserialize, Deserializer, Serialize, Seria
 use crate::{
     account,
     account::TryFromSliceForAccountHashError,
-    bytesrepr::{self, FromBytes, ToBytes, U32_SERIALIZED_LENGTH},
+    bytesrepr::{self, FromBytes, ToBytes, U32_SERIALIZED_LENGTH, U8_SERIALIZED_LENGTH},
     contract_wasm::ContractWasmHash,
     uref,
     uref::URef,
@@ -1085,7 +1085,7 @@ impl Default for Contract {
 
 /// Context of method execution
 #[repr(u8)]
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, FromPrimitive, ToPrimitive)]
 #[cfg_attr(feature = "std", derive(JsonSchema))]
 pub enum EntryPointType {
     /// Runs as session code
@@ -1096,22 +1096,21 @@ pub enum EntryPointType {
 
 impl ToBytes for EntryPointType {
     fn to_bytes(&self) -> Result<Vec<u8>, bytesrepr::Error> {
-        (*self as u8).to_bytes()
+        self.to_u8()
+            .expect("EntryPointType is represented as u8")
+            .to_bytes()
     }
 
     fn serialized_length(&self) -> usize {
-        1
+        U8_SERIALIZED_LENGTH
     }
 }
 
 impl FromBytes for EntryPointType {
     fn from_bytes(bytes: &[u8]) -> Result<(Self, &[u8]), bytesrepr::Error> {
-        let (value, bytes) = u8::from_bytes(bytes)?;
-        match value {
-            0 => Ok((EntryPointType::Session, bytes)),
-            1 => Ok((EntryPointType::Contract, bytes)),
-            _ => Err(bytesrepr::Error::Formatting),
-        }
+        let (value, bytes) = FromBytes::from_bytes(bytes)?;
+        let entry_point = EntryPointType::from_u8(value).ok_or(bytesrepr::Error::Formatting)?;
+        Ok((entry_point, bytes))
     }
 }
 
@@ -1280,7 +1279,8 @@ enum EntryPointAccessTag {
 
 impl From<EntryPointAccessTag> for u8 {
     fn from(tag: EntryPointAccessTag) -> Self {
-        tag.to_u8().unwrap()
+        tag.to_u8()
+            .expect("EntryPointAccessTag is represented as u8")
     }
 }
 
@@ -1318,8 +1318,8 @@ impl ToBytes for EntryPointAccess {
 
     fn serialized_length(&self) -> usize {
         match self {
-            EntryPointAccess::Public => 1,
-            EntryPointAccess::Groups(groups) => 1 + groups.serialized_length(),
+            EntryPointAccess::Public => U8_SERIALIZED_LENGTH,
+            EntryPointAccess::Groups(groups) => U8_SERIALIZED_LENGTH + groups.serialized_length(),
         }
     }
 }

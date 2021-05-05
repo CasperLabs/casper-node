@@ -72,7 +72,7 @@ impl AsymmetricKeyTag {
 
 impl From<AsymmetricKeyTag> for u8 {
     fn from(tag: AsymmetricKeyTag) -> Self {
-        tag.to_u8().unwrap()
+        tag.to_u8().expect("AsymmetricKeyTag is represented as u8")
     }
 }
 

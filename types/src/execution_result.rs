@@ -32,32 +32,10 @@ use serde::{Deserialize, Serialize};
 use crate::KEY_HASH_LENGTH;
 use crate::{
     account::AccountHash,
-    bytesrepr::{self, FromBytes, ToBytes, U8_SERIALIZED_LENGTH},
+    bytesrepr::{self, EitherTag, FromBytes, ToBytes, U8_SERIALIZED_LENGTH},
     system::auction::{Bid, EraInfo, UnbondingPurse},
     CLValue, DeployInfo, Key, NamedKey, Transfer, TransferAddr, U128, U256, U512,
 };
-
-/// Constants to track ExecutionResult serialization.
-#[derive(FromPrimitive, ToPrimitive)]
-#[repr(u8)]
-enum ExecutionResultTag {
-    Failure = 0,
-    Success = 1,
-}
-
-impl From<ExecutionResultTag> for u8 {
-    fn from(tag: ExecutionResultTag) -> Self {
-        tag.to_u8().unwrap()
-    }
-}
-
-impl FromBytes for ExecutionResultTag {
-    fn from_bytes(bytes: &[u8]) -> Result<(Self, &[u8]), bytesrepr::Error> {
-        let (tag_value, rem) = FromBytes::from_bytes(bytes)?;
-        let tag = ExecutionResultTag::from_u8(tag_value).ok_or(bytesrepr::Error::Formatting)?;
-        Ok((tag, rem))
-    }
-}
 
 /// Constants to track Transform serialization.
 #[derive(FromPrimitive, ToPrimitive)]
@@ -87,7 +65,9 @@ impl From<TransformTag> for u8 {
     fn from(transform_tag: TransformTag) -> Self {
         // NOTE: Considered safe as `TransformTag` has `repr(u8)` annotation and its variant wouldnt
         // exceed 255 entries.
-        transform_tag.to_u8().unwrap()
+        transform_tag
+            .to_u8()
+            .expect("TransformTag is represented as u8")
     }
 }
 
@@ -237,7 +217,7 @@ impl ToBytes for ExecutionResult {
                 cost,
                 error_message,
             } => {
-                buffer.push(ExecutionResultTag::Failure.into());
+                buffer.push(EitherTag::Left.into());
                 buffer.extend(effect.to_bytes()?);
                 buffer.extend(transfers.to_bytes()?);
                 buffer.extend(cost.to_bytes()?);
@@ -248,7 +228,7 @@ impl ToBytes for ExecutionResult {
                 transfers,
                 cost,
             } => {
-                buffer.push(ExecutionResultTag::Success.into());
+                buffer.push(EitherTag::Right.into());
                 buffer.extend(effect.to_bytes()?);
                 buffer.extend(transfers.to_bytes()?);
                 buffer.extend(cost.to_bytes()?);
@@ -286,9 +266,9 @@ impl ToBytes for ExecutionResult {
 
 impl FromBytes for ExecutionResult {
     fn from_bytes(bytes: &[u8]) -> Result<(Self, &[u8]), bytesrepr::Error> {
-        let (tag, remainder) = ExecutionResultTag::from_bytes(bytes)?;
+        let (tag, remainder) = EitherTag::from_bytes(bytes)?;
         match tag {
-            ExecutionResultTag::Failure => {
+            EitherTag::Left => {
                 let (effect, remainder) = ExecutionEffect::from_bytes(remainder)?;
                 let (transfers, remainder) = Vec::<TransferAddr>::from_bytes(remainder)?;
                 let (cost, remainder) = U512::from_bytes(remainder)?;
@@ -301,7 +281,7 @@ impl FromBytes for ExecutionResult {
                 };
                 Ok((execution_result, remainder))
             }
-            ExecutionResultTag::Success => {
+            EitherTag::Right => {
                 let (effect, remainder) = ExecutionEffect::from_bytes(remainder)?;
                 let (transfers, remainder) = Vec::<TransferAddr>::from_bytes(remainder)?;
                 let (cost, remainder) = U512::from_bytes(remainder)?;
@@ -413,7 +393,9 @@ pub enum OpKind {
 
 impl ToBytes for OpKind {
     fn to_bytes(&self) -> Result<Vec<u8>, bytesrepr::Error> {
-        self.to_u8().unwrap().to_bytes()
+        self.to_u8()
+            .expect("OpKind is represented as u8")
+            .to_bytes()
     }
 
     fn serialized_length(&self) -> usize {
