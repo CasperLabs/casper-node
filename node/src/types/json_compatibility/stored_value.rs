@@ -4,19 +4,25 @@
 // TODO - remove once schemars stops causing warning.
 #![allow(clippy::field_reassign_with_default)]
 
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 
+use hex::FromHexError;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 use casper_execution_engine::shared::stored_value::StoredValue as ExecutionEngineStoredValue;
 use casper_types::{
-    bytesrepr::{self, ToBytes},
+    bytesrepr::{self, Bytes, ToBytes},
     system::auction::{Bid, EraInfo, UnbondingPurse},
-    CLValue, DeployInfo, Transfer,
+    CLValue, ContractWasm, DeployInfo, Transfer,
 };
 
 use super::{Account, Contract, ContractPackage};
+use crate::types::json_compatibility::{
+    account::TryFromAccountForExecutionEngineAccountError,
+    contracts::TryFromContractForDomainContract,
+};
 
 /// Representation of a value stored in global state.
 ///
@@ -75,5 +81,72 @@ impl TryFrom<&ExecutionEngineStoredValue> for StoredValue {
         };
 
         Ok(stored_value)
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum TryFromStoredValueForExecutionEngineStoredValueError {
+    #[error("could not convert from hex: {0}")]
+    FromHexError(#[from] FromHexError),
+    #[error("could not deserialize: {0}")]
+    BytesreprError(#[from] bytesrepr::Error),
+    #[error("could not convert JSON Account to domain object: {0}")]
+    TryFromAccountForExecutionEngineAccountError(
+        #[from] TryFromAccountForExecutionEngineAccountError,
+    ),
+    #[error("could not convert JSON Contract to domain object: {0}")]
+    TryFromContractForDomainContract(#[from] TryFromContractForDomainContract),
+}
+
+impl TryFrom<StoredValue> for ExecutionEngineStoredValue {
+    type Error = TryFromStoredValueForExecutionEngineStoredValueError;
+
+    fn try_from(value: StoredValue) -> Result<Self, Self::Error> {
+        match value {
+            StoredValue::CLValue(cl_value) => {
+                // No conversion necessary
+                Ok(ExecutionEngineStoredValue::CLValue(cl_value))
+            }
+            StoredValue::Account(json_account) => {
+                let account = json_account.try_into()?;
+                Ok(ExecutionEngineStoredValue::Account(account))
+            }
+            StoredValue::ContractWasm(hex_bytes) => {
+                let bytes = hex::decode(hex_bytes)?;
+                let bytes_vec: Bytes = bytesrepr::deserialize(bytes)?;
+                let contract_wasm = ContractWasm::new(bytes_vec.to_vec());
+                Ok(ExecutionEngineStoredValue::ContractWasm(contract_wasm))
+            }
+            StoredValue::Contract(json_contract) => {
+                let contract = json_contract.try_into()?;
+                Ok(ExecutionEngineStoredValue::Contract(contract))
+            }
+            StoredValue::ContractPackage(json_contract_package) => {
+                let contract_package = json_contract_package.into();
+                Ok(ExecutionEngineStoredValue::ContractPackage(
+                    contract_package,
+                ))
+            }
+            StoredValue::Transfer(transfer) => {
+                // No conversion necessary
+                Ok(ExecutionEngineStoredValue::Transfer(transfer))
+            }
+            StoredValue::DeployInfo(deploy_info) => {
+                // No conversion necessary
+                Ok(ExecutionEngineStoredValue::DeployInfo(deploy_info))
+            }
+            StoredValue::EraInfo(era_info) => {
+                // No conversion necessary
+                Ok(ExecutionEngineStoredValue::EraInfo(era_info))
+            }
+            StoredValue::Bid(bid) => {
+                // No conversion necessary
+                Ok(ExecutionEngineStoredValue::Bid(bid))
+            }
+            StoredValue::Withdraw(withdraws) => {
+                // No conversion necessary
+                Ok(ExecutionEngineStoredValue::Withdraw(withdraws))
+            }
+        }
     }
 }

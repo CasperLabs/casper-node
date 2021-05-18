@@ -3,6 +3,8 @@
 // TODO - remove once schemars stops causing warning.
 #![allow(clippy::field_reassign_with_default)]
 
+mod retrieval;
+
 use std::str;
 
 use futures::{future::BoxFuture, FutureExt};
@@ -17,6 +19,7 @@ use warp_json_rpc::Builder;
 use casper_execution_engine::core::engine_state::{BalanceResult, GetBidsResult};
 use casper_types::{bytesrepr::ToBytes, CLValue, Key, ProtocolVersion, URef, U512};
 
+pub use self::retrieval::GetKeysWithPrefix;
 use super::{
     docs::{DocExample, DOCS_EXAMPLE_PROTOCOL_VERSION},
     Error, ErrorCode, ReactorEventT, RpcRequest, RpcWithParams, RpcWithParamsExt,

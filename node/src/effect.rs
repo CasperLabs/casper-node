@@ -87,6 +87,7 @@ use casper_execution_engine::{
         era_validators::GetEraValidatorsError,
         execution_effect::ExecutionEffect,
         genesis::GenesisResult,
+        query::GetKeysWithPrefixResult,
         step::{StepRequest, StepResult},
         upgrade::{UpgradeConfig, UpgradeResult},
         BalanceRequest, BalanceResult, GetBidsRequest, GetBidsResult, QueryRequest, QueryResult,
@@ -1491,6 +1492,26 @@ impl<REv> EffectBuilder<REv> {
         self.make_request(
             |responder| ContractRuntimeRequest::GetProtocolData {
                 protocol_version,
+                responder,
+            },
+            QueueKind::Regular,
+        )
+        .await
+    }
+
+    /// Get all keys with the given prefix.
+    pub(crate) async fn get_keys_with_prefix(
+        self,
+        state_root_hash: Blake2bHash,
+        prefix: Vec<u8>,
+    ) -> Result<GetKeysWithPrefixResult, engine_state::Error>
+    where
+        REv: From<ContractRuntimeRequest>,
+    {
+        self.make_request(
+            |responder| ContractRuntimeRequest::GetKeysWithPrefix {
+                state_root_hash,
+                prefix,
                 responder,
             },
             QueueKind::Regular,

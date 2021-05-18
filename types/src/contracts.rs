@@ -549,7 +549,8 @@ impl JsonSchema for ContractPackageHash {
 }
 
 /// A enum to determine the lock status of the contract package.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Deserialize, Serialize, DataSize)]
+#[cfg_attr(feature = "std", derive(JsonSchema))]
 pub enum ContractPackageStatus {
     /// The package is locked and cannot be versioned.
     Locked,
@@ -787,8 +788,8 @@ impl ContractPackage {
     }
 
     /// Return the package status itself
-    pub fn get_lock_status(&self) -> ContractPackageStatus {
-        self.lock_status.clone()
+    pub fn lock_status(&self) -> ContractPackageStatus {
+        self.lock_status
     }
 }
 

@@ -1,0 +1,22 @@
+[package]
+name = "retrieve-state"
+version = "0.1.0"
+authors = ["Henry Till <henrytill@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1"
+casper-execution-engine = { path = "../../execution_engine" }
+casper-node = { path = "../../node" }
+casper-types = { path = "../../types" }
+futures = "0.3.5"
+hex = { version = "0.4.2", features = ["serde"] }
+jsonrpc-lite = "0.5.0"
+lmdb = "0.8.0"
+reqwest = { version = "0.11.1", features = ["json"] }
+serde = { version = "1", default-features = false, features = ["derive"] }
+serde_json = "1"
+structopt = "0.3.21"
+tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "sync", "time"] }

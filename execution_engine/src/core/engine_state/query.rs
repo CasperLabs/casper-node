@@ -7,6 +7,12 @@ use crate::{
 };
 
 #[derive(Debug)]
+pub enum GetKeysWithPrefixResult {
+    RootNotFound,
+    Success { keys: Vec<Key> },
+}
+
+#[derive(Debug)]
 pub enum QueryResult {
     RootNotFound,
     ValueNotFound(String),

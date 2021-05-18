@@ -1,3 +1,5 @@
+//! Defines the core key type used in the merkle trie.
+
 use alloc::{
     format,
     string::{String, ToString},
@@ -104,19 +106,33 @@ pub enum Key {
     Withdraw(AccountHash),
 }
 
+/// Enumeration of all possible errors parsing a `Key` from `str`.
 #[derive(Debug)]
 pub enum FromStrError {
+    /// Represents an error when parsing `Account`, wraps `account::FromStrError`.
     Account(account::FromStrError),
+    /// Represents an error when parsing a `Hash`.
     Hash(String),
+    /// Represents an error when parsing a `URef`, wraps `uref::FromStrError`.
     URef(uref::FromStrError),
+    /// Represents an error when parsing a `Transfer`, wraps `account::FromStrError`.
     Transfer(TransferFromStrError),
+    /// Represents an error when parsing a `DeployInfo`.
     DeployInfo(String),
+    /// Represents an error when parsing an `EraInfo`.
     EraInfo(String),
+    /// Represents an error when parsing a `Balance`.
     Balance(String),
+    /// Represents an error when parsing a `Bid`.
     Bid(String),
+    /// Represents an error when parsing a `Withdraw`.
     Withdraw(String),
+    /// Represents an error when the provided string lacks a known prefix.
     UnknownPrefix,
 }
+
+#[cfg(feature = "std")]
+impl std::error::Error for FromStrError {}
 
 impl From<account::FromStrError> for FromStrError {
     fn from(error: account::FromStrError) -> Self {

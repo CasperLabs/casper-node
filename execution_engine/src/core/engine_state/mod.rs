@@ -120,6 +120,10 @@ where
         &self.config
     }
 
+    pub fn state(&self) -> &S {
+        &self.state
+    }
+
     pub fn get_protocol_data(
         &self,
         protocol_version: ProtocolVersion,

@@ -1618,6 +1618,11 @@ pub(crate) mod json_compatibility {
             }
         }
 
+        /// Returns this `JsonBlock`'s state root hash.
+        pub fn state_root_hash(&self) -> &Digest {
+            &self.header.state_root_hash
+        }
+
         /// Returns the hashes of the `Deploy`s included in the `Block`.
         pub fn deploy_hashes(&self) -> &Vec<DeployHash> {
             &self.body.deploy_hashes

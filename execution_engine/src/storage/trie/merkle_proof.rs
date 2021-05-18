@@ -2,6 +2,9 @@ use std::collections::VecDeque;
 
 use casper_types::bytesrepr::{self, Bytes, FromBytes, ToBytes};
 
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+
 use crate::{
     shared::newtypes::Blake2bHash,
     storage::trie::{Pointer, Trie, RADIX},
@@ -11,7 +14,7 @@ const TRIE_MERKLE_PROOF_STEP_NODE_ID: u8 = 0;
 const TRIE_MERKLE_PROOF_STEP_EXTENSION_ID: u8 = 1;
 
 /// A component of a proof that an entry exists in the Merkle trie.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub enum TrieMerkleProofStep {
     /// Corresponds to [`Trie::Node`]
     Node {
@@ -19,6 +22,7 @@ pub enum TrieMerkleProofStep {
         indexed_pointers_with_hole: Vec<(u8, Pointer)>,
     },
     /// Corresponds to [`Trie::Extension`]
+    #[schemars(with = "String", description = "Hex encoded extension")]
     Extension { affix: Bytes },
 }
 
@@ -101,7 +105,7 @@ impl FromBytes for TrieMerkleProofStep {
 
 /// A proof that a node with a specified `key` and `value` is present in the Merkle trie.
 /// Given a state hash `x`, one can validate a proof `p` by checking `x == p.compute_state_hash()`.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, JsonSchema, Serialize, Deserialize)]
 pub struct TrieMerkleProof<K, V> {
     key: K,
     value: V,
