@@ -1451,7 +1451,7 @@ impl<REv> EffectBuilder<REv> {
                     let balance_request = BalanceRequest::new(state_hash, purse_uref);
                     if let Ok(balance_result) = self.get_balance(balance_request).await {
                         if let Some(motes) = balance_result.motes() {
-                            return Some(motes >= &*MAX_PAYMENT);
+                            return Some(motes >= &MAX_PAYMENT.value());
                         }
                     }
                 }

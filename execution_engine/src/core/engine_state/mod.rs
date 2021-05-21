@@ -89,7 +89,7 @@ use crate::{
 };
 
 pub const MAX_PAYMENT_AMOUNT: u64 = 2_500_000_000;
-pub static MAX_PAYMENT: Lazy<U512> = Lazy::new(|| U512::from(MAX_PAYMENT_AMOUNT));
+pub static MAX_PAYMENT: Lazy<Gas> = Lazy::new(|| Gas::new(U512::from(MAX_PAYMENT_AMOUNT)));
 
 /// Gas/motes conversion rate of wasmless transfer cost is always 1 regardless of what user wants to
 /// pay.
@@ -1173,7 +1173,8 @@ where
             Err(error) => return Ok(ExecutionResult::precondition_failure(error.into())),
         };
 
-        let max_payment_cost = Motes::new(*MAX_PAYMENT);
+        let max_payment_cost = Motes::from_gas(*MAX_PAYMENT, deploy_item.gas_price)
+            .ok_or(Error::GasConversionOverflow)?;
 
         // Enforce minimum main purse balance validation
         // validation_spec_5: account main purse minimum balance

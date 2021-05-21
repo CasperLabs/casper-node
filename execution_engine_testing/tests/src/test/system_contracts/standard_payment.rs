@@ -32,7 +32,7 @@ fn should_raise_insufficient_payment_when_caller_lacks_minimum_balance() {
     let exec_request = ExecuteRequestBuilder::standard(
         *DEFAULT_ACCOUNT_ADDR,
         TRANSFER_PURSE_TO_ACCOUNT_WASM,
-        runtime_args! { ARG_TARGET => account_1_account_hash, ARG_AMOUNT => *MAX_PAYMENT - U512::one() },
+        runtime_args! { ARG_TARGET => account_1_account_hash, ARG_AMOUNT => (*MAX_PAYMENT).value() - U512::one() },
     )
     .build();
 
@@ -107,7 +107,7 @@ fn should_forward_payment_execution_runtime_error() {
 
     let transaction_fee = builder.get_proposer_purse_balance() - proposer_reward_starting_balance;
     let initial_balance: U512 = U512::from(DEFAULT_ACCOUNT_INITIAL_BALANCE);
-    let expected_reward_balance = *MAX_PAYMENT;
+    let expected_reward_balance = MAX_PAYMENT.value();
 
     let modified_balance = builder.get_purse_balance(
         builder
@@ -176,7 +176,7 @@ fn should_forward_payment_execution_gas_limit_error() {
 
     let transaction_fee = builder.get_proposer_purse_balance() - proposer_reward_starting_balance;
     let initial_balance: U512 = U512::from(DEFAULT_ACCOUNT_INITIAL_BALANCE);
-    let expected_reward_balance = *MAX_PAYMENT;
+    let expected_reward_balance = MAX_PAYMENT.value();
 
     let modified_balance = builder.get_purse_balance(
         builder
@@ -209,11 +209,9 @@ fn should_forward_payment_execution_gas_limit_error() {
     let execution_result = utils::get_success_result(response);
     let error = execution_result.as_error().expect("should have error");
     assert_matches!(error, Error::Exec(execution::Error::GasLimit));
-    let payment_gas_limit = Gas::from_motes(Motes::new(*MAX_PAYMENT), DEFAULT_GAS_PRICE)
-        .expect("should convert to gas");
     assert_eq!(
         execution_result.cost(),
-        payment_gas_limit,
+        *MAX_PAYMENT,
         "cost should equal gas limit"
     );
 }
