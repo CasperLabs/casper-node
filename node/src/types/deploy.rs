@@ -10,7 +10,6 @@ use std::{
 
 use datasize::DataSize;
 use derive_more::Display;
-use hex::FromHexError;
 use itertools::Itertools;
 use num_traits::Zero;
 use once_cell::sync::Lazy;
@@ -210,8 +209,8 @@ pub enum Error {
     InvalidPayment,
 }
 
-impl From<FromHexError> for Error {
-    fn from(error: FromHexError) -> Self {
+impl From<base16::DecodeError> for Error {
+    fn from(error: base16::DecodeError) -> Self {
         Error::DecodeFromJson(Box::new(error))
     }
 }

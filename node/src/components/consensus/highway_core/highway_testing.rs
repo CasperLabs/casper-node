@@ -8,7 +8,6 @@ use std::{
 };
 
 use datasize::DataSize;
-use hex_fmt::HexFmt;
 use itertools::Itertools;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
@@ -41,6 +40,7 @@ use crate::{
     types::Timestamp,
     NodeRng,
 };
+use casper_types::check_summed_hex;
 
 type ConsensusValue = Vec<u8>;
 
@@ -1003,7 +1003,7 @@ pub(crate) struct SignatureWrapper(u64);
 
 impl Debug for SignatureWrapper {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{:10}", HexFmt(self.0.to_le_bytes()))
+        write!(f, "{:10}", check_summed_hex::encode(&self.0.to_le_bytes()))
     }
 }
 
@@ -1014,7 +1014,7 @@ pub(crate) struct HashWrapper(u64);
 
 impl Debug for HashWrapper {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{:10}", HexFmt(self.0.to_le_bytes()))
+        write!(f, "{:10}", check_summed_hex::encode(&self.0.to_le_bytes()))
     }
 }
 

@@ -17,7 +17,7 @@ use casper_engine_tests::profiling;
 use casper_execution_engine::core::engine_state::{
     engine_config::EngineConfig, genesis::ExecConfig, run_genesis_request::RunGenesisRequest,
 };
-use casper_types::{runtime_args, RuntimeArgs};
+use casper_types::{check_summed_hex, runtime_args, RuntimeArgs};
 
 const ABOUT: &str = "Initializes global state in preparation for profiling runs. Outputs the root \
                      hash from the commit response.";
@@ -90,5 +90,5 @@ fn main() {
         .expect_success()
         .commit()
         .get_post_state_hash();
-    println!("{}", base16::encode_lower(&post_state_hash));
+    println!("{}", check_summed_hex::encode(&post_state_hash));
 }

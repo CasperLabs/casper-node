@@ -5,12 +5,15 @@ use std::{
 
 use casper_execution_engine::shared::{newtypes::Blake2bHash, stored_value::StoredValue};
 use casper_types::{
-    bytesrepr::ToBytes, system::auction::SeigniorageRecipientsSnapshot, Key, PublicKey,
+    bytesrepr::ToBytes, check_summed_hex, system::auction::SeigniorageRecipientsSnapshot, Key,
+    PublicKey,
 };
 
 /// Parses a Blake2bHash from a string. Panics if parsing fails.
 pub fn hash_from_str(hex_str: &str) -> Blake2bHash {
-    (&base16::decode(hex_str).unwrap()[..]).try_into().unwrap()
+    (&check_summed_hex::decode(hex_str).unwrap()[..])
+        .try_into()
+        .unwrap()
 }
 
 /// Prints a global state update entry in a format ready for inclusion in a TOML file.

@@ -1,7 +1,5 @@
 use std::result;
 
-use base64::DecodeError;
-use hex::FromHexError;
 use pem::PemError;
 use signature::Error as SignatureError;
 use thiserror::Error;
@@ -21,7 +19,14 @@ pub enum Error {
 
     /// Error resulting when decoding a type from a hex-encoded representation.
     #[error("parsing from hex: {0}")]
-    FromHex(#[from] FromHexError),
+    FromHex(#[from] base16::DecodeError),
+
+    /// Attempted to coerce an array which is not 32 bytes into a [`Digest`].
+    #[error("Digest must be 32 bytes, was {actual_byte_length}")]
+    DigestMustBe32Bytes {
+        /// The actual number of bytes we were trying to convert into a [`Digest`].
+        actual_byte_length: usize,
+    },
 
     /// Error trying to read a secret key.
     #[error("secret key load failed: {0}")]
@@ -33,7 +38,7 @@ pub enum Error {
 
     /// Error resulting when decoding a type from a base64 representation.
     #[error("decoding error: {0}")]
-    FromBase64(#[from] DecodeError),
+    FromBase64(#[from] base64::DecodeError),
 
     /// Pem format error.
     #[error("pem error: {0}")]

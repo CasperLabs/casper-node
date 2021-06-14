@@ -27,7 +27,7 @@ use thiserror::Error;
 
 use crate::{
     bytesrepr::{Error, FromBytes, ToBytes, U8_SERIALIZED_LENGTH},
-    CLType, CLTyped, PublicKey, BLAKE2B_DIGEST_LENGTH,
+    check_summed_hex, CLType, CLTyped, PublicKey, BLAKE2B_DIGEST_LENGTH,
 };
 
 pub(super) const ACCOUNT_HASH_FORMATTED_STRING_PREFIX: &str = "account-hash-";
@@ -240,7 +240,7 @@ impl AccountHash {
         format!(
             "{}{}",
             ACCOUNT_HASH_FORMATTED_STRING_PREFIX,
-            base16::encode_lower(&self.0),
+            check_summed_hex::encode(&self.0),
         )
     }
 
@@ -249,7 +249,7 @@ impl AccountHash {
         let remainder = input
             .strip_prefix(ACCOUNT_HASH_FORMATTED_STRING_PREFIX)
             .ok_or(FromStrError::InvalidPrefix)?;
-        let bytes = AccountHashBytes::try_from(base16::decode(remainder)?.as_ref())?;
+        let bytes = AccountHashBytes::try_from(check_summed_hex::decode(remainder)?.as_ref())?;
         Ok(AccountHash(bytes))
     }
 
@@ -360,13 +360,13 @@ impl From<&PublicKey> for AccountHash {
 
 impl Display for AccountHash {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        write!(f, "{}", base16::encode_lower(&self.0))
+        write!(f, "{}", check_summed_hex::encode(&self.0))
     }
 }
 
 impl Debug for AccountHash {
     fn fmt(&self, f: &mut Formatter) -> core::fmt::Result {
-        write!(f, "AccountHash({})", base16::encode_lower(&self.0))
+        write!(f, "AccountHash({})", check_summed_hex::encode(&self.0))
     }
 }
 

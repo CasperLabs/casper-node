@@ -7,9 +7,10 @@ use std::{
     thread,
 };
 
-use hex_fmt::HexFmt;
 use rand::{self, CryptoRng, Error, Rng, RngCore, SeedableRng};
 use rand_pcg::Pcg64Mcg;
+
+use casper_types::check_summed_hex;
 
 thread_local! {
     static THIS_THREAD_HAS_RNG: RefCell<bool> = RefCell::new(false);
@@ -95,7 +96,11 @@ impl Default for TestRng {
 
 impl Display for TestRng {
     fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        write!(formatter, "TestRng seed: {}", HexFmt(&self.seed))
+        write!(
+            formatter,
+            "TestRng seed: {}",
+            check_summed_hex::encode(&self.seed)
+        )
     }
 }
 
@@ -110,7 +115,7 @@ impl Drop for TestRng {
         if thread::panicking() {
             let line_1 = format!("Thread: {}", thread::current().name().unwrap_or("unnamed"));
             let line_2 = "To reproduce failure, try running with env var:";
-            let line_3 = format!("{}={}", CL_TEST_SEED, HexFmt(&self.seed));
+            let line_3 = format!("{}={}", CL_TEST_SEED, check_summed_hex::encode(&self.seed));
             let max_length = cmp::max(line_1.len(), line_2.len());
             let border = "=".repeat(max_length);
             println!(

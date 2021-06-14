@@ -10,7 +10,6 @@ use core::{
 };
 
 use datasize::DataSize;
-use hex_fmt::HexFmt;
 use rand::{
     distributions::{Distribution, Standard},
     Rng,
@@ -22,7 +21,7 @@ use serde::{de::Error as SerdeError, Deserialize, Deserializer, Serialize, Seria
 use crate::{
     bytesrepr,
     bytesrepr::{Error, FromBytes},
-    AccessRights, ApiError, Key, ACCESS_RIGHTS_SERIALIZED_LENGTH,
+    check_summed_hex, AccessRights, ApiError, Key, ACCESS_RIGHTS_SERIALIZED_LENGTH,
 };
 
 /// The number of bytes in a [`URef`] address.
@@ -160,7 +159,7 @@ impl URef {
         format!(
             "{}{}-{:03o}",
             UREF_FORMATTED_STRING_PREFIX,
-            base16::encode_lower(&self.addr()),
+            check_summed_hex::encode(&self.addr()),
             access_rights_bits
         )
     }
@@ -200,7 +199,12 @@ impl Display for URef {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         let addr = self.addr();
         let access_rights = self.access_rights();
-        write!(f, "URef({}, {})", HexFmt(&addr), access_rights)
+        write!(
+            f,
+            "URef({}, {})",
+            check_summed_hex::encode(&addr),
+            access_rights
+        )
     }
 }
 

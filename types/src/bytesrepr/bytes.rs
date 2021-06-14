@@ -21,7 +21,7 @@ use serde::{
 };
 
 use super::{Error, FromBytes, ToBytes};
-use crate::{CLType, CLTyped};
+use crate::{check_summed_hex, CLType, CLTyped};
 
 /// A newtype wrapper for bytes that has efficient serialization routines.
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq, Debug, Default, Hash)]
@@ -274,7 +274,7 @@ impl<'de> Deserialize<'de> for Bytes {
     {
         if deserializer.is_human_readable() {
             let hex_string = String::deserialize(deserializer)?;
-            base16::decode(&hex_string)
+            check_summed_hex::decode(&hex_string)
                 .map(Bytes)
                 .map_err(SerdeError::custom)
         } else {
@@ -290,7 +290,7 @@ impl Serialize for Bytes {
         S: Serializer,
     {
         if serializer.is_human_readable() {
-            base16::encode_lower(&self.0).serialize(serializer)
+            check_summed_hex::encode(&self.0).serialize(serializer)
         } else {
             serializer.serialize_bytes(&self.0)
         }
@@ -352,7 +352,7 @@ mod tests {
         let bytes_ser: Bytes = truth.clone().into();
 
         let json_object = serde_json::to_value(bytes_ser).unwrap();
-        assert_eq!(json_object, json!("deadbeef"));
+        assert_eq!(json_object, json!("DEaDBeef"));
 
         let bytes_de: Bytes = serde_json::from_value(json_object).unwrap();
         assert_eq!(bytes_de, Bytes::from(truth));
@@ -361,7 +361,7 @@ mod tests {
     #[test]
     fn should_ser_de_readable() {
         let truth: Bytes = TRUTH.into();
-        assert_tokens(&truth.readable(), &[Token::Str("deadbeef")]);
+        assert_tokens(&truth.readable(), &[Token::Str("DEaDBeef")]);
     }
 
     #[test]

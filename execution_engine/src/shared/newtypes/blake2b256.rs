@@ -7,7 +7,10 @@ use blake2::{
 };
 use serde::{Deserialize, Serialize};
 
-use casper_types::bytesrepr::{self, FromBytes, ToBytes};
+use casper_types::{
+    bytesrepr::{self, FromBytes, ToBytes},
+    check_summed_hex,
+};
 
 /// Represents a 32-byte BLAKE2b hash digest
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default, Serialize, Deserialize)]
@@ -37,31 +40,9 @@ impl Blake2bHash {
     }
 }
 
-impl core::fmt::LowerHex for Blake2bHash {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        let hex_string = base16::encode_lower(&self.value());
-        if f.alternate() {
-            write!(f, "0x{}", hex_string)
-        } else {
-            write!(f, "{}", hex_string)
-        }
-    }
-}
-
-impl core::fmt::UpperHex for Blake2bHash {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        let hex_string = base16::encode_upper(&self.value());
-        if f.alternate() {
-            write!(f, "0x{}", hex_string)
-        } else {
-            write!(f, "{}", hex_string)
-        }
-    }
-}
-
 impl core::fmt::Display for Blake2bHash {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        write!(f, "Blake2bHash({:#x})", self)
+        write!(f, "Blake2bHash({})", check_summed_hex::encode(self))
     }
 }
 

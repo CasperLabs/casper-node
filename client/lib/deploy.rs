@@ -331,6 +331,83 @@ mod tests {
         }
       ]
     }"#;
+    // This intentionally has awkward indentation. It was formatted with serde::to_string_pretty.
+    // It is used in serialization tests.
+    const CHECK_SUMMED_SAMPLE_DEPLOY: &str = r#"{
+  "hash": "4858bBd79ab7B825244C4E6959CbCd588a05608168ef36518Bc6590937191D55",
+  "header": {
+    "account": "01f60BCE2bb1059C41910eac1e7EE6C3ef4C8fCC63a901eb9603c1524CAdFb0C18",
+    "timestamp": "2021-01-19T01:18:19.120Z",
+    "ttl": "10s",
+    "gas_price": 1,
+    "body_hash": "95f2f2358C4864f01F8b073aE6f5aE67baeAF7747fc0799D0078743C513Bc1De",
+    "dependencies": [
+      "Be5fDEEA0240E999E376F8ecbCe1Bd4Fd9336F58daE4a5842558a4dA6aD35aA8",
+      "168d7Ea9c88E76B3eEF72759F2A7af24663CC871A469C7bA1387CA479e82fB41"
+    ],
+    "chain_name": "casper-test-chain-name-1"
+  },
+  "payment": {
+    "StoredVersionedContractByHash": {
+      "hash": "09DCeE4b212cfd53642AB323FbEf07daFAFC6F945A80a00147f62910A915c4E6",
+      "version": null,
+      "entry_point": "entrypoint",
+      "args": [
+        [
+          "name_01",
+          {
+            "cl_type": "Bool",
+            "bytes": "00",
+            "parsed": false
+          }
+        ],
+        [
+          "name_02",
+          {
+            "cl_type": "I32",
+            "bytes": "2a000000",
+            "parsed": 42
+          }
+        ]
+      ]
+    }
+  },
+  "session": {
+    "StoredVersionedContractByHash": {
+      "hash": "09DCeE4b212cfd53642AB323FbEf07daFAFC6F945A80a00147f62910A915c4E6",
+      "version": null,
+      "entry_point": "entrypoint",
+      "args": [
+        [
+          "name_01",
+          {
+            "cl_type": "Bool",
+            "bytes": "00",
+            "parsed": false
+          }
+        ],
+        [
+          "name_02",
+          {
+            "cl_type": "I32",
+            "bytes": "2a000000",
+            "parsed": 42
+          }
+        ]
+      ]
+    }
+  },
+  "approvals": [
+    {
+      "signer": "01f60BCE2bb1059C41910eac1e7EE6C3ef4C8fCC63a901eb9603c1524CAdFb0C18",
+      "signature": "010f538ef188770CdBF608BC2d7aa9460108B419b2b629f5E0714204A7f29149809A1d52776B0c514e3320494fDf6f9e9747f06f2c14dDF6f924CE218148E2840A"
+    },
+    {
+      "signer": "01e67D6E56AE07ECA98b07ecEC8cfBe826B4D5bC51F3a86590C0882cdAfbD72FCC",
+      "signature": "01c4F58D7f6145C1e4397efCe766149CdE5450cBe74991269161e5E1f30a397e6Bc4c484F3C72a645cEfD42c55CfdE0294Bfd91dE55Ca977798c3C8D2A7e43a40c"
+    }
+  ]
+}"#;
 
     #[derive(Debug)]
     struct ErrWrapper(pub Error);
@@ -436,6 +513,15 @@ mod tests {
             Deploy::read_deploy(bytes).map(|_| ()).map_err(ErrWrapper),
             Ok(())
         );
+    }
+
+    #[test]
+    fn should_round_trip_check_summed_sample_deploy_json() {
+        let bytes = CHECK_SUMMED_SAMPLE_DEPLOY.as_bytes();
+        let reader = BufReader::new(bytes);
+        let deploy: Deploy = serde_json::from_reader(reader).unwrap();
+        let casper_case_json_string = serde_json::to_string_pretty(&deploy).unwrap();
+        assert_eq!(CHECK_SUMMED_SAMPLE_DEPLOY, casper_case_json_string);
     }
 
     #[test]

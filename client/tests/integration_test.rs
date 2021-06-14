@@ -10,7 +10,6 @@ use warp::{Filter, Rejection};
 use warp_json_rpc::Builder;
 
 use casper_node::crypto::Error as CryptoError;
-use hex::FromHexError;
 
 use casper_client::{DeployStrParams, Error, PaymentStrParams, SessionStrParams};
 use casper_node::rpcs::{
@@ -302,7 +301,9 @@ mod get_balance {
             server_handle.get_balance("", ""),
             Err(Error::CryptoError {
                 context: "state_root_hash",
-                error: CryptoError::FromHex(FromHexError::InvalidStringLength)
+                error: CryptoError::DigestMustBe32Bytes {
+                    actual_byte_length: 0
+                }
             }
             .into())
         );
@@ -315,7 +316,9 @@ mod get_balance {
             server_handle.get_balance("", VALID_PURSE_UREF),
             Err(Error::CryptoError {
                 context: "state_root_hash",
-                error: CryptoError::FromHex(FromHexError::InvalidStringLength)
+                error: CryptoError::DigestMustBe32Bytes {
+                    actual_byte_length: 0
+                }
             }
             .into())
         );
@@ -337,7 +340,9 @@ mod get_balance {
             server_handle.get_balance("deadbeef", VALID_PURSE_UREF),
             Err(Error::CryptoError {
                 context: "state_root_hash",
-                error: CryptoError::FromHex(FromHexError::InvalidStringLength)
+                error: CryptoError::DigestMustBe32Bytes {
+                    actual_byte_length: 8
+                }
             }
             .into())
         );
@@ -463,7 +468,7 @@ mod get_item {
             server_handle.get_item("<invalid state root hash>", VALID_PURSE_UREF, ""),
             Err(Error::CryptoError {
                 context: "state_root_hash",
-                error: CryptoError::FromHex(FromHexError::OddLength)
+                error: CryptoError::FromHex(base16::DecodeError::InvalidLength { length: 25 })
             }
             .into())
         );
@@ -485,7 +490,7 @@ mod get_item {
             server_handle.get_item("<invalid state root hash>", "", ""),
             Err(Error::CryptoError {
                 context: "state_root_hash",
-                error: CryptoError::FromHex(FromHexError::OddLength)
+                error: CryptoError::FromHex(base16::DecodeError::InvalidLength { length: 25 })
             }
             .into())
         );
@@ -512,7 +517,9 @@ mod get_deploy {
             server_handle.get_deploy("012345",),
             Err(Error::CryptoError {
                 context: "deploy_hash",
-                error: CryptoError::FromHex(FromHexError::InvalidStringLength)
+                error: CryptoError::DigestMustBe32Bytes {
+                    actual_byte_length: 6
+                }
             }
             .into())
         );

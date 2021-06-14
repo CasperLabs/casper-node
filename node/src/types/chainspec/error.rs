@@ -64,7 +64,7 @@ pub enum ChainspecAccountsLoadError {
 
     /// Error while decoding a chainspec account's key hash from hex format.
     #[error("decoding from hex error: {0}")]
-    DecodingFromHex(#[from] hex::FromHexError),
+    DecodingFromHex(#[from] base16::DecodeError),
 
     /// Error while decoding Motes from a decimal format.
     #[error("decoding motes from base-10 error: {0}")]

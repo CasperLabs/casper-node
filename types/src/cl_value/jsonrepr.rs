@@ -5,7 +5,7 @@ use serde_json::{json, Value};
 
 use crate::{
     bytesrepr::{self, FromBytes, OPTION_NONE_TAG, OPTION_SOME_TAG, RESULT_ERR_TAG, RESULT_OK_TAG},
-    CLType, CLValue, Key, PublicKey, URef, U128, U256, U512,
+    check_summed_hex, CLType, CLValue, Key, PublicKey, URef, U128, U256, U512,
 };
 
 /// Returns a best-effort attempt to convert the `CLValue` into a meaningful JSON value.
@@ -55,7 +55,7 @@ fn to_json<'a>(cl_type: &CLType, bytes: &'a [u8]) -> Option<(Value, &'a [u8])> {
         }
         CLType::ByteArray(length) => {
             let (bytes, remainder) = bytesrepr::safe_split_at(bytes, *length as usize).ok()?;
-            Some((json![hex::encode(bytes)], remainder))
+            Some((json![check_summed_hex::encode(bytes)], remainder))
         }
         CLType::Result { ok, err } => {
             let (variant, remainder) = u8::from_bytes(bytes).ok()?;
@@ -204,7 +204,7 @@ mod tests {
         let bytes = [1_u8, 2];
         let cl_value = CLValue::from_t(bytes).unwrap();
         let cl_value_as_json = cl_value_to_json(&cl_value).unwrap();
-        let expected = json!(hex::encode(&bytes));
+        let expected = json!(check_summed_hex::encode(&bytes));
         assert_eq!(cl_value_as_json, expected);
     }
 

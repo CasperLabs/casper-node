@@ -17,8 +17,6 @@ use blake2::{
 };
 
 use datasize::DataSize;
-use hex::FromHexError;
-use hex_fmt::HexList;
 use once_cell::sync::Lazy;
 #[cfg(test)]
 use rand::Rng;
@@ -175,8 +173,8 @@ pub enum Error {
     DecodeFromJson(Box<dyn StdError>),
 }
 
-impl From<FromHexError> for Error {
-    fn from(error: FromHexError) -> Self {
+impl From<base16::DecodeError> for Error {
+    fn from(error: base16::DecodeError) -> Self {
         Error::DecodeFromJson(Box::new(error))
     }
 }
@@ -253,8 +251,8 @@ impl Display for BlockPayload {
         write!(
             formatter,
             "block payload: deploys {}, transfers {}, accusations {:?}, random bit {}",
-            HexList(&self.deploy_hashes),
-            HexList(&self.transfer_hashes),
+            format!("[{}]", itertools::join(&self.deploy_hashes, ", ")),
+            format!("[{}]", itertools::join(&self.transfer_hashes, ", ")),
             self.accusations,
             self.random_bit,
         )
@@ -487,8 +485,8 @@ impl Display for FinalizedBlock {
             random bit {}, timestamp {}",
             self.era_id,
             self.height,
-            HexList(&self.deploy_hashes),
-            HexList(&self.transfer_hashes),
+            format!("[{}]", itertools::join(&self.deploy_hashes, ", ")),
+            format!("[{}]", itertools::join(&self.transfer_hashes, ", ")),
             self.random_bit,
             self.timestamp,
         )?;

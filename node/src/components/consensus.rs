@@ -24,11 +24,10 @@ use std::{
 
 use datasize::DataSize;
 use derive_more::From;
-use hex_fmt::HexFmt;
 use serde::{Deserialize, Serialize};
 use tracing::error;
 
-use casper_types::{EraId, PublicKey, U512};
+use casper_types::{check_summed_hex, EraId, PublicKey, U512};
 
 use crate::{
     components::Component,
@@ -157,7 +156,12 @@ impl Display for ConsensusMessage {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             ConsensusMessage::Protocol { era_id, payload } => {
-                write!(f, "protocol message {:10} in {}", HexFmt(payload), era_id)
+                write!(
+                    f,
+                    "protocol message {:10} in {}",
+                    check_summed_hex::encode(payload),
+                    era_id
+                )
             }
             ConsensusMessage::EvidenceRequest { era_id, pub_key } => write!(
                 f,

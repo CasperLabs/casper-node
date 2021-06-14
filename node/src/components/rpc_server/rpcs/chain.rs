@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use tracing::info;
 use warp_json_rpc::Builder;
 
-use casper_types::{Key, ProtocolVersion, Transfer};
+use casper_types::{check_summed_hex, Key, ProtocolVersion, Transfer};
 
 use super::{
     docs::{DocExample, DOCS_EXAMPLE_PROTOCOL_VERSION},
@@ -423,7 +423,7 @@ impl RpcWithOptionalParamsExt for GetEraInfoBySwitchBlock {
                     era_id,
                     stored_value,
                     state_root_hash,
-                    merkle_proof: hex::encode(proof_bytes),
+                    merkle_proof: check_summed_hex::encode(&proof_bytes),
                 }),
             };
 

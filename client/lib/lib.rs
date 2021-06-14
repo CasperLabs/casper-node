@@ -1288,7 +1288,7 @@ mod param_tests {
                 result,
                 Err(Error::CryptoError {
                     context: "dependencies",
-                    error: CryptoError::FromHex(hex::FromHexError::OddLength)
+                    error: CryptoError::FromHex(base16::DecodeError::InvalidLength { length: 11 })
                 }
                 .into())
             );

@@ -5,8 +5,8 @@
 
 use std::{
     array::TryFromSliceError,
-    convert::TryFrom,
-    fmt::{self, Debug, Display, Formatter, LowerHex, UpperHex},
+    convert::{TryFrom, TryInto},
+    fmt::{self, Debug, Display, Formatter},
 };
 
 use blake2::{
@@ -14,15 +14,16 @@ use blake2::{
     VarBlake2b,
 };
 use datasize::DataSize;
-use hex_buffer_serde::{Hex, HexForm};
-use hex_fmt::HexFmt;
 #[cfg(test)]
 use rand::Rng;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use casper_execution_engine::shared::newtypes::Blake2bHash;
-use casper_types::bytesrepr::{self, FromBytes, ToBytes};
+use casper_types::{
+    bytesrepr::{self, FromBytes, ToBytes},
+    check_summed_hex::{self, CheckSummedHex, CheckSummedHexForm},
+};
 
 use super::Error;
 #[cfg(test)]
@@ -44,9 +45,9 @@ use crate::testing::TestRng;
     JsonSchema,
 )]
 #[serde(deny_unknown_fields)]
-#[schemars(with = "String", description = "Hex-encoded hash digest.")]
+#[schemars(with = "String", description = "Check-summed hex-encoded hash digest.")]
 pub struct Digest(
-    #[serde(with = "HexForm::<[u8; Digest::LENGTH]>")]
+    #[serde(with = "CheckSummedHexForm::<[u8; Digest::LENGTH]>")]
     #[schemars(skip, with = "String")]
     [u8; Digest::LENGTH],
 );
@@ -67,9 +68,12 @@ impl Digest {
 
     /// Returns a `Digest` parsed from a hex-encoded `Digest`.
     pub fn from_hex<T: AsRef<[u8]>>(hex_input: T) -> Result<Self, Error> {
-        let mut inner = [0; Digest::LENGTH];
-        hex::decode_to_slice(hex_input, &mut inner)?;
-        Ok(Digest(inner))
+        let bytes = check_summed_hex::decode(&hex_input)?;
+        let slice: [u8; Self::LENGTH] =
+            bytes.try_into().map_err(|_| Error::DigestMustBe32Bytes {
+                actual_byte_length: hex_input.as_ref().len(),
+            })?;
+        Ok(Digest(slice))
     }
 
     /// Generates a random instance using a `TestRng`.
@@ -101,32 +105,13 @@ impl TryFrom<&[u8]> for Digest {
 
 impl Debug for Digest {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-        write!(formatter, "{}", HexFmt(&self.0))
+        write!(formatter, "{}", check_summed_hex::encode(&self.0))
     }
 }
 
 impl Display for Digest {
     fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-        write!(formatter, "{:10}", HexFmt(&self.0))
-    }
-}
-impl LowerHex for Digest {
-    fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        if formatter.alternate() {
-            write!(formatter, "0x{}", HexFmt(&self.0))
-        } else {
-            write!(formatter, "{}", HexFmt(&self.0))
-        }
-    }
-}
-
-impl UpperHex for Digest {
-    fn fmt(&self, formatter: &mut Formatter) -> fmt::Result {
-        if formatter.alternate() {
-            write!(formatter, "0x{:X}", HexFmt(&self.0))
-        } else {
-            write!(formatter, "{:X}", HexFmt(&self.0))
-        }
+        write!(formatter, "{:10}", check_summed_hex::encode(&self.0))
     }
 }
 
@@ -183,15 +168,15 @@ mod test {
         let inputs_and_digests = [
             (
                 "",
-                "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8",
+                "0e5751c026e543B2e8AB2EB06099Daa1d1e5df47778F7787faAB45cdf12Fe3A8",
             ),
             (
                 "abc",
-                "bddd813c634239723171ef3fee98579b94964e3bb1cb3e427262c8c068d52319",
+                "BddD813C634239723171eF3fEE98579B94964E3bB1cB3E427262C8c068d52319",
             ),
             (
                 "The quick brown fox jumps over the lazy dog",
-                "01718cec35cd3d796dd00020e0bfecb473ad23457d063b75eff29c0ffa2e58a9",
+                "01718cEc35Cd3D796dd00020e0BfEcb473AD23457d063b75EFf29c0ffA2e58a9",
             ),
         ];
         for (known_input, expected_digest) in &inputs_and_digests {
@@ -235,32 +220,11 @@ mod test {
     }
 
     #[test]
-    fn should_print_digest_lower_hex() {
+    fn should_print_digest_hex() {
         let hash = Digest([10u8; 32]);
-        let hash_lower_hex = format!("{:x}", hash);
         assert_eq!(
-            hash_lower_hex,
-            "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a"
-        )
-    }
-
-    #[test]
-    fn should_print_digest_upper_hex() {
-        let hash = Digest([10u8; 32]);
-        let hash_lower_hex = format!("{:X}", hash);
-        assert_eq!(
-            hash_lower_hex,
-            "0A0A0A0A0A0A0A0A0A0A0A0A0A0A0A0A0A0A0A0A0A0A0A0A0A0A0A0A0A0A0A0A"
-        )
-    }
-
-    #[test]
-    fn alternate_should_prepend_0x() {
-        let hash = Digest([0u8; 32]);
-        let hash_hex_alt = format!("{:#x}", hash);
-        assert_eq!(
-            hash_hex_alt,
-            "0x0000000000000000000000000000000000000000000000000000000000000000"
+            check_summed_hex::encode(&hash),
+            "0a0A0a0A0A0A0A0a0A0a0A0a0A0A0a0A0A0a0a0a0a0A0A0a0a0a0A0A0A0A0A0A"
         )
     }
 

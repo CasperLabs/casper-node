@@ -23,6 +23,7 @@ use crate::{
     account,
     account::TryFromSliceForAccountHashError,
     bytesrepr::{self, FromBytes, ToBytes, U32_SERIALIZED_LENGTH},
+    check_summed_hex,
     contract_wasm::ContractWasmHash,
     uref,
     uref::URef,
@@ -285,7 +286,7 @@ impl ContractHash {
         format!(
             "{}{}",
             CONTRACT_STRING_PREFIX,
-            base16::encode_lower(&self.0),
+            check_summed_hex::encode(&self.0),
         )
     }
 
@@ -295,20 +296,20 @@ impl ContractHash {
         let remainder = input
             .strip_prefix(CONTRACT_STRING_PREFIX)
             .ok_or(FromStrError::InvalidPrefix)?;
-        let bytes = HashAddr::try_from(base16::decode(remainder)?.as_ref())?;
+        let bytes = HashAddr::try_from(check_summed_hex::decode(remainder)?.as_ref())?;
         Ok(ContractHash(bytes))
     }
 }
 
 impl Display for ContractHash {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        write!(f, "{}", base16::encode_lower(&self.0))
+        write!(f, "{}", check_summed_hex::encode(&self.0))
     }
 }
 
 impl Debug for ContractHash {
     fn fmt(&self, f: &mut Formatter) -> core::fmt::Result {
-        write!(f, "ContractHash({})", base16::encode_lower(&self.0))
+        write!(f, "ContractHash({})", check_summed_hex::encode(&self.0))
     }
 }
 
@@ -428,7 +429,11 @@ impl ContractPackageHash {
 
     /// Formats the `ContractPackageHash` for users getting and putting.
     pub fn to_formatted_string(&self) -> String {
-        format!("{}{}", PACKAGE_STRING_PREFIX, base16::encode_lower(&self.0),)
+        format!(
+            "{}{}",
+            PACKAGE_STRING_PREFIX,
+            check_summed_hex::encode(&self.0),
+        )
     }
 
     /// Parses a string formatted as per `Self::to_formatted_string()` into a
@@ -437,20 +442,24 @@ impl ContractPackageHash {
         let remainder = input
             .strip_prefix(PACKAGE_STRING_PREFIX)
             .ok_or(FromStrError::InvalidPrefix)?;
-        let bytes = HashAddr::try_from(base16::decode(remainder)?.as_ref())?;
+        let bytes = HashAddr::try_from(check_summed_hex::decode(remainder)?.as_ref())?;
         Ok(ContractPackageHash(bytes))
     }
 }
 
 impl Display for ContractPackageHash {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        write!(f, "{}", base16::encode_lower(&self.0))
+        write!(f, "{}", check_summed_hex::encode(&self.0))
     }
 }
 
 impl Debug for ContractPackageHash {
     fn fmt(&self, f: &mut Formatter) -> core::fmt::Result {
-        write!(f, "ContractPackageHash({})", base16::encode_lower(&self.0))
+        write!(
+            f,
+            "ContractPackageHash({})",
+            check_summed_hex::encode(&self.0)
+        )
     }
 }
 

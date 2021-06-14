@@ -13,7 +13,6 @@ use std::{
 };
 
 use bytes::{Bytes, BytesMut};
-use hex_fmt::HexFmt;
 use openssl::ssl::SslRef;
 use pin_project::pin_project;
 #[cfg(test)]
@@ -31,6 +30,7 @@ use crate::{
     types::NodeId,
     utils,
 };
+use casper_types::check_summed_hex;
 
 /// Lazily-evaluated network message ID generator.
 ///
@@ -40,7 +40,7 @@ struct TraceId([u8; 8]);
 
 impl Display for TraceId {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.write_str(&format!("{:x}", HexFmt(&self.0)))
+        f.write_str(&check_summed_hex::encode(&self.0))
     }
 }
 

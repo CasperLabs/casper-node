@@ -4,7 +4,6 @@ use std::{
 };
 
 use datasize::DataSize;
-use hex_fmt::HexFmt;
 use libp2p::PeerId;
 #[cfg(test)]
 use multihash::Multihash;
@@ -16,6 +15,7 @@ use serde::{de::Error as SerdeError, Deserialize, Deserializer, Serialize, Seria
 #[cfg(test)]
 use crate::testing::TestRng;
 use crate::{rpcs::docs::DocExample, tls::KeyFingerprint};
+use casper_types::check_summed_hex;
 
 /// The network identifier for a node.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, DataSize)]
@@ -82,7 +82,7 @@ impl Serialize for NodeId {
         if serializer.is_human_readable() {
             let helper = match self {
                 NodeId::Tls(key_fingerprint) => {
-                    NodeIdAsString::Tls(hex::encode(key_fingerprint.as_ref()))
+                    NodeIdAsString::Tls(check_summed_hex::encode(key_fingerprint.as_ref()))
                 }
                 NodeId::P2p(peer_id) => NodeIdAsString::P2p(peer_id.to_base58()),
             };
@@ -103,7 +103,7 @@ impl<'de> Deserialize<'de> for NodeId {
             let helper = NodeIdAsString::deserialize(deserializer)?;
             match helper {
                 NodeIdAsString::Tls(hex_value) => {
-                    let bytes = hex::decode(hex_value).map_err(D::Error::custom)?;
+                    let bytes = check_summed_hex::decode(&hex_value).map_err(D::Error::custom)?;
                     if bytes.len() != KeyFingerprint::LENGTH {
                         return Err(SerdeError::custom("wrong length"));
                     }
@@ -145,7 +145,7 @@ impl Debug for NodeId {
             NodeId::Tls(key_fingerprint) => write!(
                 formatter,
                 "NodeId::Tls({})",
-                HexFmt(key_fingerprint.as_ref())
+                check_summed_hex::encode(key_fingerprint.as_ref())
             ),
             NodeId::P2p(peer_id) => write!(formatter, "PeerId::P2p({})", peer_id.to_base58()),
         }
@@ -158,7 +158,7 @@ impl Display for NodeId {
             NodeId::Tls(key_fingerprint) => write!(
                 formatter,
                 "NodeId::Tls({:10})",
-                HexFmt(key_fingerprint.as_ref())
+                check_summed_hex::encode(key_fingerprint.as_ref())
             ),
             NodeId::P2p(peer_id) => {
                 let base58_peer_id = peer_id.to_base58();

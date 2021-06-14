@@ -33,7 +33,6 @@ use std::{
 
 use anyhow::Context;
 use datasize::DataSize;
-use hex_fmt::HexFmt;
 use nid::Nid;
 use openssl::{
     asn1::{Asn1Integer, Asn1IntegerRef, Asn1Time},
@@ -56,6 +55,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use thiserror::Error;
 
 use crate::utils::{read_file, write_file};
+use casper_types::check_summed_hex;
 
 // This is inside a private module so that the generated `BigArray` does not form part of this
 // crate's public API, and hence also doesn't appear in the rustdocs.
@@ -135,7 +135,11 @@ pub(crate) struct CertFingerprint(Sha512);
 
 impl Debug for CertFingerprint {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "CertFingerprint({:10})", HexFmt(self.0.bytes()))
+        write!(
+            f,
+            "CertFingerprint({:10})",
+            check_summed_hex::encode(self.0.bytes())
+        )
     }
 }
 
@@ -156,7 +160,11 @@ impl AsRef<[u8]> for KeyFingerprint {
 
 impl Debug for KeyFingerprint {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "KeyFingerprint({:10})", HexFmt(self.0.bytes()))
+        write!(
+            f,
+            "KeyFingerprint({:10})",
+            check_summed_hex::encode(self.0.bytes())
+        )
     }
 }
 
@@ -181,7 +189,7 @@ struct Signature(Vec<u8>);
 
 impl Debug for Signature {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "Signature({:10})", HexFmt(&self.0))
+        write!(f, "Signature({:10})", check_summed_hex::encode(&self.0))
     }
 }
 
@@ -756,13 +764,13 @@ impl PartialOrd for Sha512 {
 
 impl Debug for Sha512 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", HexFmt(&self.0[..]))
+        write!(f, "{}", check_summed_hex::encode(&self.0[..]))
     }
 }
 
 impl Display for Sha512 {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{:10}", HexFmt(&self.0[..]))
+        write!(f, "{:10}", check_summed_hex::encode(&self.0[..]))
     }
 }
 
@@ -774,13 +782,13 @@ impl Display for CertFingerprint {
 
 impl Display for KeyFingerprint {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{:10}", HexFmt(self.0.bytes()))
+        write!(f, "{:10}", check_summed_hex::encode(self.0.bytes()))
     }
 }
 
 impl Display for Signature {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{:10}", HexFmt(&self.0[..]))
+        write!(f, "{:10}", check_summed_hex::encode(&self.0[..]))
     }
 }
 
