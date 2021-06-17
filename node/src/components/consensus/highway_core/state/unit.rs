@@ -25,6 +25,8 @@ where
     /// The list of latest units and faults observed by the creator of this message.
     /// The panorama must be valid, and this unit's creator must not be marked as faulty.
     pub(crate) panorama: Panorama<C>,
+    /// The panorama's hash, so we don't have to recompute it.
+    pub(crate) panorama_hash: C::Hash,
     /// The number of earlier messages by the same creator.
     /// This must be `0` if the creator's entry in the panorama is `None`. Otherwise it must be
     /// the previous unit's sequence number plus one.
@@ -59,6 +61,7 @@ impl<C: Context> Unit<C> {
     /// Values must be stored as a block, with the same hash.
     pub(super) fn new(
         swunit: SignedWireUnit<C>,
+        panorama: Panorama<C>,
         fork_choice: Option<&C::Hash>,
         state: &State<C>,
     ) -> (Unit<C>, Option<C::ConsensusValue>) {
@@ -78,15 +81,17 @@ impl<C: Context> Unit<C> {
                 .expect("nonempty panorama has nonempty fork choice")
         };
         let mut skip_idx = Vec::new();
-        if let Some(hash) = wunit.panorama.get(wunit.creator).correct() {
+        if let Some(hash) = wunit.previous() {
             skip_idx.push(*hash);
             for i in 0..wunit.seq_number.trailing_zeros() as usize {
                 let old_unit = state.unit(&skip_idx[i]);
                 skip_idx.push(old_unit.skip_idx[i]);
             }
         }
+        let panorama_hash = panorama.hash();
         let unit = Unit {
-            panorama: wunit.panorama,
+            panorama,
+            panorama_hash,
             seq_number: wunit.seq_number,
             creator: wunit.creator,
             block,

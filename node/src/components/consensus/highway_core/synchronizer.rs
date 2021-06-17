@@ -78,7 +78,10 @@ impl<I: NodeIdT, C: Context> PendingVertices<I, C> {
 
     /// Returns whether dependency exists in the pending vertices collection.
     fn contains_dependency(&self, d: &Dependency<C>) -> bool {
-        self.0.keys().any(|pvv| &pvv.inner().id() == d)
+        self.0.keys().any(|pvv| match (&pvv.inner().id(), d) {
+            (Dependency::UnitWithPanorama(hash0), Dependency::Unit(hash1)) => hash0 == hash1,
+            (dep0, dep1) => dep0 == dep1,
+        })
     }
 
     /// Drops all pending vertices other than evidence.
@@ -313,7 +316,7 @@ impl<I: NodeIdT, C: Context + 'static> Synchronizer<I, C> {
         let satisfied_deps = self
             .vertices_awaiting_deps
             .keys()
-            .filter(|dep| highway.has_dependency(dep))
+            .filter(|dep| highway.has_dependency(dep) != Some(false))
             .cloned()
             .collect_vec();
         // Safe to unwrap: We know the keys exist. TODO: Replace with BTreeMap::retain once stable.
@@ -374,7 +377,7 @@ impl<I: NodeIdT, C: Context + 'static> Synchronizer<I, C> {
                 if pending_values
                     .values()
                     .flatten()
-                    .any(|(vv, s)| vv.inner().id() == transitive_dependency && s == &sender)
+                    .any(|(vv, s)| vv.inner().id().matches(&transitive_dependency) && s == &sender)
                 {
                     continue;
                 }
@@ -384,7 +387,7 @@ impl<I: NodeIdT, C: Context + 'static> Synchronizer<I, C> {
                 if let Some((vv, _)) = pending_values
                     .values()
                     .flatten()
-                    .find(|(vv, _)| vv.inner().id() == transitive_dependency)
+                    .find(|(vv, _)| vv.inner().id().matches(&transitive_dependency))
                 {
                     info!(
                         dependency = ?transitive_dependency, %sender,

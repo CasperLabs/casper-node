@@ -74,7 +74,7 @@ where
     /// The path to the file storing the hash of our latest known unit (if any).
     unit_file: Option<PathBuf>,
     /// The last known unit created by us.
-    own_last_unit: Option<SignedWireUnit<C>>,
+    own_last_unit: Option<(SignedWireUnit<C>, Panorama<C>)>,
     /// The target fault tolerance threshold. The validator pauses (i.e. doesn't create new units)
     /// if not enough validators are online to finalize values at this FTT.
     target_ftt: Weight,
@@ -141,22 +141,20 @@ impl<C: Context> ActiveValidator<C> {
     fn can_vote(&self, state: &State<C>) -> bool {
         self.own_last_unit
             .as_ref()
-            .map_or(true, |swunit| state.has_unit(&swunit.hash()))
+            .map_or(true, |(swunit, _)| state.has_unit(&swunit.hash()))
     }
 
     /// Returns whether validator's protocol state is synchronized up until the panorama of its own
     /// last unit.
     pub(crate) fn is_own_last_unit_panorama_sync(&self, state: &State<C>) -> bool {
-        self.own_last_unit.as_ref().map_or(true, |swunit| {
-            swunit
-                .wire_unit()
-                .panorama
+        self.own_last_unit.as_ref().map_or(true, |(_, panorama)| {
+            panorama
                 .iter_correct_hashes()
                 .all(|hash| state.has_unit(hash))
         })
     }
 
-    pub(crate) fn take_own_last_unit(&mut self) -> Option<SignedWireUnit<C>> {
+    pub(crate) fn take_own_last_unit(&mut self) -> Option<(SignedWireUnit<C>, Panorama<C>)> {
         self.own_last_unit.take()
     }
 
@@ -197,7 +195,7 @@ impl<C: Context> ActiveValidator<C> {
                 return effects;
             } else if timestamp == r_id + self.witness_offset(r_len) {
                 let panorama = self.panorama_at(state, timestamp);
-                if let Some(witness_unit) =
+                if let Some(witness_vv) =
                     self.new_unit(panorama, timestamp, None, state, instance_id)
                 {
                     if self
@@ -206,7 +204,7 @@ impl<C: Context> ActiveValidator<C> {
                     {
                         info!(round_id = %r_id, "sending witness in round with no proposal");
                     }
-                    effects.push(Effect::NewVertex(ValidVertex(Vertex::Unit(witness_unit))));
+                    effects.push(Effect::NewVertex(witness_vv));
                     return effects;
                 }
             }
@@ -256,11 +254,10 @@ impl<C: Context> ActiveValidator<C> {
         if self.should_send_confirmation(uhash, now, state) {
             let panorama = state.confirmation_panorama(self.vidx, uhash);
             if panorama.has_correct() {
-                if let Some(confirmation_unit) =
+                if let Some(confirmation_vv) =
                     self.new_unit(panorama, now, None, state, instance_id)
                 {
-                    let vv = ValidVertex(Vertex::Unit(confirmation_unit));
-                    effects.push(Effect::NewVertex(vv));
+                    effects.push(Effect::NewVertex(confirmation_vv));
                 }
             }
         };
@@ -311,7 +308,7 @@ impl<C: Context> ActiveValidator<C> {
         if maybe_parent_hash.map_or(false, |hash| state.is_terminal_block(hash)) {
             return self
                 .new_unit(panorama, timestamp, None, state, instance_id)
-                .map(|proposal_unit| Effect::NewVertex(ValidVertex(Vertex::Unit(proposal_unit))));
+                .map(Effect::NewVertex);
         }
         // Otherwise we need to request a new consensus value to propose.
         let ancestor_values = match maybe_parent_hash {
@@ -354,7 +351,7 @@ impl<C: Context> ActiveValidator<C> {
             return vec![];
         }
         self.new_unit(panorama, timestamp, Some(value), state, instance_id)
-            .map(|proposal_unit| Effect::NewVertex(ValidVertex(Vertex::Unit(proposal_unit))))
+            .map(Effect::NewVertex)
             .into_iter()
             .collect()
     }
@@ -413,7 +410,7 @@ impl<C: Context> ActiveValidator<C> {
         value: Option<C::ConsensusValue>,
         state: &State<C>,
         instance_id: C::InstanceId,
-    ) -> Option<SignedWireUnit<C>> {
+    ) -> Option<ValidVertex<C>> {
         if value.is_none() && !panorama.has_correct() {
             return None; // Wait for the first proposal before creating a unit without a value.
         }
@@ -440,10 +437,15 @@ impl<C: Context> ActiveValidator<C> {
             );
             return None;
         }
+        let previous = panorama[self.vidx].correct().cloned();
         let seq_number = panorama.next_seq_num(state, self.vidx);
         let endorsed = state.seen_endorsed(&panorama);
+        let panorama_hash = panorama.hash();
+        let seq_num_panorama = panorama.to_seq_num_panorama(&state);
         let hwunit = WireUnit {
-            panorama,
+            seq_num_panorama,
+            panorama_hash,
+            previous,
             creator: self.vidx,
             instance_id,
             value,
@@ -454,13 +456,13 @@ impl<C: Context> ActiveValidator<C> {
         }
         .into_hashed();
         let swunit = SignedWireUnit::new(hwunit, &self.secret);
-        write_last_unit(&self.unit_file, swunit.clone()).unwrap_or_else(|err| {
+        write_last_unit(&self.unit_file, &swunit, &panorama).unwrap_or_else(|err| {
             panic!(
                 "should successfully write unit's hash to {:?}, got {:?}",
                 self.unit_file, err
             )
         });
-        Some(swunit)
+        Some(ValidVertex(Vertex::UnitWithPanorama(swunit, panorama)))
     }
 
     /// Returns a `ScheduleTimer` effect for the next time we need to be called.
@@ -577,7 +579,7 @@ impl<C: Context> ActiveValidator<C> {
             return false;
         }
         match vertex {
-            Vertex::Unit(swunit) => {
+            Vertex::Unit(swunit) | Vertex::UnitWithPanorama(swunit, _) => {
                 // If we already have the unit in our local state,
                 // we must have had created it ourselves earlier and it is now gossiped back to us.
                 self.is_our_unit(swunit.wire_unit()) && !state.has_unit(&swunit.hash())
@@ -605,7 +607,7 @@ impl<C: Context> ActiveValidator<C> {
     }
 }
 
-pub(crate) fn read_last_unit<C, P>(path: P) -> io::Result<SignedWireUnit<C>>
+pub(crate) fn read_last_unit<C, P>(path: P) -> io::Result<(SignedWireUnit<C>, Panorama<C>)>
 where
     C: Context,
     P: AsRef<Path>,
@@ -618,7 +620,8 @@ where
 
 pub(crate) fn write_last_unit<C: Context>(
     unit_file: &Option<PathBuf>,
-    swunit: SignedWireUnit<C>,
+    swunit: &SignedWireUnit<C>,
+    panorama: &Panorama<C>,
 ) -> io::Result<()> {
     // If there is no unit_file set, do not write to it
     let unit_file = if let Some(file) = unit_file.as_ref() {
@@ -634,7 +637,7 @@ pub(crate) fn write_last_unit<C: Context>(
     let mut file = File::create(unit_file)?;
 
     // Finally, write the data to file we created
-    let bytes = serde_json::to_vec(&swunit)?;
+    let bytes = serde_json::to_vec(&(swunit, panorama))?;
 
     file.write_all(&bytes)
 }
@@ -646,7 +649,7 @@ mod tests {
     use tempfile::tempdir;
 
     use crate::components::consensus::highway_core::{
-        highway_testing::TEST_INSTANCE_ID, validators::ValidatorMap,
+        highway::ObservationSeqNum, highway_testing::TEST_INSTANCE_ID, validators::ValidatorMap,
     };
 
     use super::{
@@ -654,17 +657,18 @@ mod tests {
             finality_detector::FinalityDetector,
             state::{tests::*, State, Weight},
         },
-        Vertex, *,
+        *,
     };
 
     type Eff = Effect<TestContext>;
 
     impl Eff {
-        fn unwrap_unit(self) -> SignedWireUnit<TestContext> {
-            if let Eff::NewVertex(ValidVertex(Vertex::Unit(swunit))) = self {
-                swunit
-            } else {
-                panic!("Unexpected effect: {:?}", self);
+        fn unwrap_unit(self) -> (SignedWireUnit<TestContext>, Panorama<TestContext>) {
+            match self {
+                Eff::NewVertex(ValidVertex(Vertex::UnitWithPanorama(swunit, panorama))) => {
+                    (swunit, panorama)
+                }
+                _ => panic!("Unexpected effect: {:?}", self),
             }
         }
 
@@ -784,9 +788,11 @@ mod tests {
             let effects = validator.propose(cv, block_context, &self.state, self.instance_id);
 
             // Add the new unit to the state.
-            let proposal_wunit = unwrap_single(&effects).unwrap_unit();
+            let (proposal_wunit, panorama) = unwrap_single(&effects).unwrap_unit();
             let prop_hash = proposal_wunit.hash();
-            self.state.add_unit(proposal_wunit.clone()).unwrap();
+            self.state
+                .add_unit(proposal_wunit.clone(), panorama)
+                .unwrap();
             let effects = validator.on_new_unit(
                 &prop_hash,
                 proposal_timestamp + 1.into(),
@@ -842,23 +848,19 @@ mod tests {
         fn add_new_unit(&mut self, effects: &[Effect<TestContext>]) {
             let new_units: Vec<_> = effects
                 .iter()
-                .filter_map(|eff| {
-                    if let Effect::NewVertex(ValidVertex(Vertex::Unit(swunit))) = eff {
-                        Some(swunit)
-                    } else {
-                        None
+                .filter_map(|eff| match eff {
+                    Effect::NewVertex(ValidVertex(Vertex::UnitWithPanorama(swunit, panorama))) => {
+                        Some((swunit, panorama))
                     }
+                    _ => None,
                 })
                 .collect();
             match *new_units {
                 [] => (),
-                [unit] => {
-                    let _ = self.state.add_unit(unit.clone()).unwrap();
+                [(unit, panorama)] => {
+                    let _ = self.state.add_unit(unit.clone(), panorama.clone()).unwrap();
                 }
-                _ => panic!(
-                    "Expected at most one timer to be scheduled: {:?}",
-                    new_units
-                ),
+                _ => panic!("Expected at most one unit to be added: {:?}", new_units),
             }
         }
 
@@ -978,6 +980,9 @@ mod tests {
             let a2 = add_unit!(state, ALICE, None; a1.hash())?;
             state.wire_unit(&a2, instance_id).unwrap()
         };
+        let a0_panorama = state.unit(&a0.hash()).panorama.clone();
+        let a1_panorama = state.unit(&a1.hash()).panorama.clone();
+        let a2_panorama = state.unit(&a2.hash()).panorama.clone();
         // Clean state. We want Alice to synchronize first.
         state.retain_evidence_only();
 
@@ -988,8 +993,7 @@ mod tests {
         };
 
         // Store `a2` unit as the Alice's last unit.
-        write_last_unit(&unit_file, a2.clone()).expect("storing unit should succeed");
-
+        write_last_unit(&unit_file, &a2, &a2_panorama).expect("storing unit should succeed");
         // Alice's last unit is `a2` but `State` is empty. She must synchronize first.
         let (mut alice, alice_init_effects) = ActiveValidator::new(
             ALICE,
@@ -1012,10 +1016,14 @@ mod tests {
         };
 
         // Alice has to synchronize up until `a2` (including) before she starts proposing.
-        for unit in vec![a0, a1, a2.clone()] {
+        for (unit, panorama) in vec![
+            (a0, a0_panorama),
+            (a1, a1_panorama),
+            (a2.clone(), a2_panorama),
+        ] {
             next_proposal_timer =
                 assert_no_proposal(&mut alice, &state, instance_id, next_proposal_timer);
-            state.add_unit(unit)?;
+            state.add_unit(unit, panorama)?;
         }
 
         // After synchronizing the protocol state up until `last_own_unit`, Alice can now propose a
@@ -1025,7 +1033,7 @@ mod tests {
             effects => panic!("unexpected effects {:?}", effects),
         };
 
-        let proposal_wunit =
+        let (proposal_wunit, _panorama) =
             unwrap_single(&alice.propose(0xC0FFEE, bctx, &state, instance_id)).unwrap_unit();
         assert_eq!(
             proposal_wunit.wire_unit().seq_number,
@@ -1033,8 +1041,8 @@ mod tests {
             "new unit should have correct seq_number"
         );
         assert_eq!(
-            proposal_wunit.wire_unit().panorama,
-            panorama!(a2.hash()),
+            proposal_wunit.wire_unit().seq_num_panorama[ALICE],
+            ObservationSeqNum::Correct(2),
             "new unit should cite the latest unit"
         );
 

@@ -145,16 +145,17 @@ impl State<TestContext> {
     pub(crate) fn add_unit(
         &mut self,
         swunit: SignedWireUnit<TestContext>,
+        panorama: Panorama<TestContext>,
     ) -> Result<(), AddUnitError<TestContext>> {
-        if let Err(err) = self
-            .pre_validate_unit(&swunit)
-            .and_then(|()| self.validate_unit(&swunit))
-        {
+        if let Err(err) = self.pre_validate_unit(&swunit, Some(&panorama)) {
             return Err(swunit.with_error(err));
         }
-        assert_eq!(None, swunit.wire_unit().panorama.missing_dependency(self));
+        assert_eq!(None, panorama.missing_dependency(self));
+        if let Err(err) = self.validate_unit(&swunit, &panorama) {
+            return Err(swunit.with_error(err));
+        }
         assert_eq!(None, self.needs_endorsements(&swunit));
-        self.add_valid_unit(swunit);
+        self.add_valid_unit(swunit, panorama);
         Ok(())
     }
 }
@@ -177,8 +178,13 @@ fn add_unit() -> Result<(), AddUnitError<TestContext>> {
     let _a1 = add_unit!(state, ALICE, None; a0, b1, c0)?;
 
     // Wrong sequence number: Bob hasn't produced b2 yet.
+    let panorama = panorama!(N, b1, c0);
+    let panorama_hash = panorama.hash();
+    let seq_num_panorama = panorama.to_seq_num_panorama(&state);
     let mut wunit = WireUnit {
-        panorama: panorama!(N, b1, c0),
+        seq_num_panorama,
+        panorama_hash,
+        previous: Some(b1),
         creator: BOB,
         instance_id: TEST_INSTANCE_ID,
         value: None,
@@ -188,29 +194,73 @@ fn add_unit() -> Result<(), AddUnitError<TestContext>> {
         endorsed: BTreeSet::new(),
     };
     let unit = SignedWireUnit::new(wunit.clone().into_hashed(), &BOB_SEC);
-    let maybe_err = state.add_unit(unit).err().map(unit_err);
+    let maybe_err = state.add_unit(unit, panorama.clone()).err().map(unit_err);
     assert_eq!(Some(UnitError::SequenceNumber), maybe_err);
+
     // Still not valid: This would be the third unit in the first round.
     wunit.seq_number = 2;
-    let unit = SignedWireUnit::new(wunit.into_hashed(), &BOB_SEC);
-    let maybe_err = state.add_unit(unit).err().map(unit_err);
+    let unit = SignedWireUnit::new(wunit.clone().into_hashed(), &BOB_SEC);
+    let maybe_err = state.add_unit(unit, panorama).err().map(unit_err);
     assert_eq!(Some(UnitError::ThreeUnitsInRound), maybe_err);
+    wunit.timestamp = 65.into();
+
+    // Your sequence number must match the panorama.
+    wunit.seq_number = 3;
+    let unit = SignedWireUnit::new(wunit.clone().into_hashed(), &BOB_SEC);
+    let maybe_err = state.pre_validate_unit(&unit, None).err();
+    assert_eq!(Some(UnitError::SequenceNumber), maybe_err);
+    wunit.seq_number = 2;
+
+    // If a hash-based panorama is included it must match the sequence number-based one.
+    let unit = SignedWireUnit::new(wunit.into_hashed(), &BOB_SEC);
+    let maybe_err = state
+        .add_unit(unit.clone(), panorama!(a0, b1, c0))
+        .err()
+        .map(unit_err);
+    assert_eq!(Some(UnitError::PanoramaMismatch(ALICE)), maybe_err);
+    let maybe_err = state
+        .add_unit(unit.clone(), panorama!(N, b1, c0, N))
+        .err()
+        .map(unit_err);
+    assert_eq!(Some(UnitError::PanoramaLength(4)), maybe_err);
+
+    // Your previous unit must match the panorama.
+    let maybe_err = state
+        .add_unit(unit, panorama!(a0, N, c0))
+        .err()
+        .map(unit_err);
+    assert_eq!(Some(UnitError::PreviousUnit), maybe_err);
 
     // Inconsistent panorama: If you see b1, you have to see c0, too.
     let maybe_err = add_unit!(state, CAROL, None; N, b1, N).err().map(unit_err);
     assert_eq!(Some(UnitError::InconsistentPanorama(BOB)), maybe_err);
-    // And you can't make the round exponent too small
+
+    // You can't make the round exponent too small.
     let maybe_err = add_unit!(state, CAROL, 50, 5u8, None; N, b1, c0)
         .err()
         .map(unit_err);
     assert_eq!(Some(UnitError::RoundLengthExpChangedWithinRound), maybe_err);
-    // And you can't make the round exponent too big
+
+    // And you can't make the round exponent too big.
     let maybe_err = add_unit!(state, CAROL, 50, 40u8, None; N, b1, c0)
         .err()
         .map(unit_err);
     assert_eq!(Some(UnitError::RoundLengthExpGreaterThanMaximum), maybe_err);
+
     // After the round from 48 to 64 has ended, the exponent can change.
     let c1 = add_unit!(state, CAROL, 65, 5u8, None; N, b1, c0)?;
+
+    // If you don't cite any other units, you must propose a block.
+    let maybe_err = add_unit!(state, CAROL, 0, 4u8, None; N, N, N)
+        .err()
+        .map(unit_err);
+    assert_eq!(Some(UnitError::MissingBlock), maybe_err);
+
+    // You can't cite yourself as faulty.
+    let maybe_err = add_unit!(state, CAROL, 0, 4u8, 0xC; N, N, F)
+        .err()
+        .map(unit_err);
+    assert_eq!(Some(UnitError::FaultyCreator), maybe_err);
 
     // Alice has not equivocated yet, and not produced message A1.
     let missing = panorama!(F, b1, c0).missing_dependency(&state);
@@ -233,6 +283,84 @@ fn add_unit() -> Result<(), AddUnitError<TestContext>> {
 
     // The state's own panorama has been updated correctly.
     assert_eq!(*state.panorama(), panorama!(F, b2, c1));
+    Ok(())
+}
+
+#[test]
+fn compute_panorama() -> Result<(), AddUnitError<TestContext>> {
+    let mut state = State::new_test(WEIGHTS, 0);
+
+    // Create units as follows; a0, b0 are blocks:
+    //
+    // Alice: a0 — a1 — a2
+    //                 /
+    // Bob:   b0 ——— b1
+    //          \   /
+    //            c0
+    // Carol:
+    //            c0'
+    let a0 = add_unit!(state, ALICE, 0xA; N, N, N)?;
+    let a1 = add_unit!(state, ALICE, None; a0, N, N)?;
+    let b0 = add_unit!(state, BOB, 48, 4u8, 0xB; N, N, N)?;
+    let c0 = add_unit!(state, CAROL, 49, 4u8, None; N, b0, N)?;
+    let c0_prime = add_unit!(state, CAROL, 50, 4u8, None; N, b0, N)?;
+    let b1 = add_unit!(state, BOB, 49, 4u8, None; N, b0, c0)?;
+    let a2 = add_unit!(state, ALICE, None; a1, b1, F)?;
+
+    // Now we try to add a2 to a new state.
+    let mut new_state = State::new_test(WEIGHTS, 0);
+
+    // First it should request all of the creator's — Alice's — own units.
+    let a2_swunit = state.wire_unit(&a2, TEST_INSTANCE_ID).unwrap();
+    let res = new_state.compute_panorama(&a2_swunit);
+    assert_eq!(Err(Dependency::UnitBySeqNum(0, ALICE)), res);
+    let a0_swunit = state.wire_unit(&a0, TEST_INSTANCE_ID).unwrap();
+    let a0_panorama = new_state.compute_panorama(&a0_swunit).unwrap();
+    new_state.add_unit(a0_swunit, a0_panorama)?;
+
+    // Once a0 is added, it requests a1. Since a2 knows its predecessor a1 by hash, it doesn't
+    // request it by sequence number.
+    let res = new_state.compute_panorama(&a2_swunit);
+    assert_eq!(Err(Dependency::Unit(a1)), res);
+    let a1_swunit = state.wire_unit(&a1, TEST_INSTANCE_ID).unwrap();
+    let a1_panorama = new_state.compute_panorama(&a1_swunit).unwrap();
+    new_state.add_unit(a1_swunit, a1_panorama)?;
+
+    // With a1 it can start going through its sequence number-based panorama and find b1 missing.
+    // Since it doesn't even have a unit number 0 from Bob, it requests first b0, then b1.
+    let res = new_state.compute_panorama(&a2_swunit);
+    assert_eq!(Err(Dependency::UnitBySeqNum(0, BOB)), res);
+    let b0_swunit = state.wire_unit(&b0, TEST_INSTANCE_ID).unwrap();
+    let b0_panorama = new_state.compute_panorama(&b0_swunit).unwrap();
+    new_state.add_unit(b0_swunit, b0_panorama)?;
+    let res = new_state.compute_panorama(&a2_swunit);
+    assert_eq!(Err(Dependency::UnitBySeqNum(1, BOB)), res);
+    let b1_swunit = state.wire_unit(&b1, TEST_INSTANCE_ID).unwrap();
+
+    // Bob's b1 depends on c0. That should be all we need: Now we can add c0, then b1, then a2.
+    let res = new_state.compute_panorama(&b1_swunit);
+    assert_eq!(Err(Dependency::UnitBySeqNum(0, CAROL)), res);
+
+    // But not so fast! Carol equivocated and we have the wrong unit number 0.
+    let c0_prime_swunit = state.wire_unit(&c0_prime, TEST_INSTANCE_ID).unwrap();
+    let c0_prime_panorama = new_state.compute_panorama(&c0_prime_swunit).unwrap();
+    new_state.add_unit(c0_prime_swunit, c0_prime_panorama)?;
+
+    // Now b1's panorama can be computed but its hash doesn't match!
+    // We need to request the full hash-based panoramas. They contain the right c0 by hash.
+    let res = new_state.compute_panorama(&b1_swunit);
+    assert_eq!(Err(Dependency::UnitWithPanorama(b1)), res);
+    let b1_panorama = state.unit(&b1).panorama.clone();
+    let c0_swunit = state.wire_unit(&c0, TEST_INSTANCE_ID).unwrap();
+    let c0_panorama = new_state.compute_panorama(&c0_swunit).unwrap();
+    new_state.add_unit(c0_swunit, c0_panorama)?;
+
+    // Finally we can add b1 and a2. Since a2 already knows that Carol is faulty, its panorama can
+    // be computed despite the multiple forks.
+    new_state.add_unit(b1_swunit, b1_panorama)?;
+    let a2_panorama = new_state.compute_panorama(&a2_swunit).unwrap();
+    new_state.add_unit(a2_swunit, a2_panorama)?;
+
     Ok(())
 }
 

@@ -253,7 +253,8 @@ impl<I: NodeIdT, C: Context + 'static> HighwayProtocol<I, C> {
             AvEffect::NewVertex(vv) => {
                 self.log_unit_size(vv.inner(), "sending new unit");
                 self.calculate_round_exponent(&vv, now);
-                self.process_new_vertex(vv)
+                // We send the unit without its panorama, to save bandwidth.
+                self.process_new_vertex(vv.without_panorama())
             }
             AvEffect::ScheduleTimer(timestamp) => {
                 vec![ProtocolOutcome::ScheduleTimer(
@@ -271,9 +272,9 @@ impl<I: NodeIdT, C: Context + 'static> HighwayProtocol<I, C> {
         }
     }
 
-    fn process_new_vertex(&mut self, vv: ValidVertex<C>) -> ProtocolOutcomes<I, C> {
+    fn process_new_vertex(&mut self, vertex: Vertex<C>) -> ProtocolOutcomes<I, C> {
         let mut outcomes = Vec::new();
-        if let Vertex::Evidence(ev) = vv.inner() {
+        if let Vertex::Evidence(ev) = &vertex {
             let v_id = self
                 .highway
                 .validators()
@@ -282,7 +283,7 @@ impl<I: NodeIdT, C: Context + 'static> HighwayProtocol<I, C> {
                 .clone();
             outcomes.push(ProtocolOutcome::NewEvidence(v_id));
         }
-        let msg = HighwayMessage::NewVertex(vv.into());
+        let msg = HighwayMessage::NewVertex(vertex);
         outcomes.push(ProtocolOutcome::CreatedGossipMessage(msg.serialize()));
         outcomes.extend(self.detect_finality());
         outcomes
@@ -340,31 +341,30 @@ impl<I: NodeIdT, C: Context + 'static> HighwayProtocol<I, C> {
         };
 
         // If the vertex contains a consensus value, i.e. it is a proposal, request validation.
-        let vertex = vv.inner();
-        if let (Some(value), Some(timestamp), Some(swunit)) =
-            (vertex.value(), vertex.timestamp(), vertex.unit())
-        {
-            let panorama = &swunit.wire_unit().panorama;
-            let fork_choice = self.highway.state().fork_choice(panorama);
-            if value.needs_validation() {
-                self.log_proposal(vertex, "requesting proposal validation");
-                let ancestor_values = self.ancestors(fork_choice).cloned().collect();
-                let block_context = BlockContext::new(timestamp, ancestor_values);
-                let proposed_block = ProposedBlock::new(value.clone(), block_context);
-                if self
-                    .pending_values
-                    .entry(proposed_block.clone())
-                    .or_default()
-                    .insert((vv, sender.clone()))
-                {
-                    outcomes.push(ProtocolOutcome::ValidateConsensusValue {
-                        sender,
-                        proposed_block,
-                    });
+        if let Vertex::UnitWithPanorama(swunit, panorama) = vv.inner() {
+            let wunit = swunit.wire_unit();
+            if let Some(value) = &wunit.value {
+                if value.needs_validation() {
+                    let fork_choice = self.highway.state().fork_choice(&panorama);
+                    self.log_proposal(vv.inner(), "requesting proposal validation");
+                    let ancestor_values = self.ancestors(fork_choice).cloned().collect();
+                    let block_context = BlockContext::new(wunit.timestamp, ancestor_values);
+                    let proposed_block = ProposedBlock::new(value.clone(), block_context);
+                    if self
+                        .pending_values
+                        .entry(proposed_block.clone())
+                        .or_default()
+                        .insert((vv, sender.clone()))
+                    {
+                        outcomes.push(ProtocolOutcome::ValidateConsensusValue {
+                            sender,
+                            proposed_block,
+                        });
+                    }
+                    return outcomes;
+                } else {
+                    self.log_proposal(vv.inner(), "proposal does not need validation");
                 }
-                return outcomes;
-            } else {
-                self.log_proposal(vertex, "proposal does not need validation");
             }
         }
 
@@ -624,7 +624,7 @@ where
             Ok(HighwayMessage::NewVertex(v)) => {
                 let v_id = v.id();
                 // If we already have that vertex, do not process it.
-                if self.highway.has_dependency(&v_id) {
+                if self.highway.has_dependency(&v_id) == Some(true) {
                     return vec![];
                 }
                 let pvv = match self.pre_validate_vertex(v) {
@@ -689,8 +689,8 @@ where
                         vec![ProtocolOutcome::SendEvidence(sender, vid)]
                     }
                     // TODO: Should this be done via a gossip service?
-                    GetDepOutcome::Vertex(vv) => vec![ProtocolOutcome::CreatedTargetedMessage(
-                        HighwayMessage::NewVertex(vv.into()).serialize(),
+                    GetDepOutcome::Vertex(vertex) => vec![ProtocolOutcome::CreatedTargetedMessage(
+                        HighwayMessage::NewVertex(vertex).serialize(),
                         sender,
                     )],
                 }
@@ -897,8 +897,8 @@ where
             .and_then(
                 move |vidx| match self.highway.get_dependency(&Dependency::Evidence(vidx)) {
                     GetDepOutcome::None | GetDepOutcome::Evidence(_) => None,
-                    GetDepOutcome::Vertex(vv) => {
-                        let msg = HighwayMessage::NewVertex(vv.into());
+                    GetDepOutcome::Vertex(vertex) => {
+                        let msg = HighwayMessage::NewVertex(vertex);
                         Some(ProtocolOutcome::CreatedTargetedMessage(
                             msg.serialize(),
                             sender,

@@ -33,15 +33,16 @@ macro_rules! add_unit {
         let creator = $creator;
         let panorama = panorama!($($obs),*);
         let seq_number = panorama.next_seq_num(&$state, creator);
-        let maybe_parent_hash = panorama[creator].correct();
+        let previous = panorama[creator].correct().cloned();
         // Use our most recent round exponent, or the configured initial one.
-        let round_exp = maybe_parent_hash.map_or_else(
+        let round_exp = previous.as_ref().map_or_else(
             || $state.params().init_round_exp(),
             |vh| $state.unit(vh).round_exp,
         );
         let value = Option::from($val);
         // At most two units per round are allowed.
-        let two_units_limit = maybe_parent_hash
+        let two_units_limit = previous
+            .as_ref()
             .and_then(|ph| $state.unit(ph).previous())
             .map(|pph| $state.unit(pph))
             .map(|unit| unit.round_id() + unit.round_len());
@@ -61,8 +62,12 @@ macro_rules! add_unit {
                 timestamp += r_len;
             }
         }
+        let panorama_hash = panorama.hash();
+        let seq_num_panorama = panorama.to_seq_num_panorama(&$state);
         let wunit = WireUnit {
-            panorama,
+            seq_num_panorama,
+            panorama_hash,
+            previous,
             creator,
             instance_id: TEST_INSTANCE_ID,
             value,
@@ -74,7 +79,7 @@ macro_rules! add_unit {
         let hwunit = wunit.into_hashed();
         let hash = hwunit.hash();
         let swunit = SignedWireUnit::new(hwunit, &TestSecret(($creator).0));
-        $state.add_unit(swunit).map(|()| hash)
+        $state.add_unit(swunit, panorama).map(|()| hash)
     }};
     ($state: ident, $creator: expr, $time: expr, $round_exp: expr, $val: expr; $($obs:expr),*) => {{
         add_unit!($state, $creator, $time, $round_exp, $val; $($obs),*; std::collections::BTreeSet::new())
@@ -88,9 +93,14 @@ macro_rules! add_unit {
 
         let creator = $creator;
         let panorama = panorama!($($obs),*);
+        let previous = panorama[creator].correct().cloned();
+        let panorama_hash = panorama.hash();
         let seq_number = panorama.next_seq_num(&$state, creator);
+        let seq_num_panorama = panorama.to_seq_num_panorama(&$state);
         let wunit = WireUnit {
-            panorama,
+            seq_num_panorama,
+            panorama_hash,
+            previous,
             creator,
             instance_id: TEST_INSTANCE_ID,
             value: ($val).into(),
@@ -102,7 +112,7 @@ macro_rules! add_unit {
         let hwunit = wunit.into_hashed();
         let hash = hwunit.hash();
         let swunit = SignedWireUnit::new(hwunit, &TestSecret(($creator).0));
-        $state.add_unit(swunit).map(|()| hash)
+        $state.add_unit(swunit, panorama).map(|()| hash)
     }};
 }
 

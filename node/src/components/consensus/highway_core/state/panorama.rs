@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     components::consensus::{
         highway_core::{
-            highway::Dependency,
+            highway::{Dependency, ObservationSeqNum},
             state::{State, Unit, UnitError},
             validators::{ValidatorIndex, ValidatorMap},
         },
@@ -211,6 +211,26 @@ impl<C: Context> Panorama<C> {
     pub(crate) fn missing_dependency(&self, state: &State<C>) -> Option<Dependency<C>> {
         let missing_dep = |(idx, obs): (_, &Observation<C>)| obs.missing_dep(state, idx);
         self.enumerate().filter_map(missing_dep).next()
+    }
+
+    /// Returns the checksum of all hashes in this panorama.
+    pub(crate) fn hash(&self) -> C::Hash {
+        <C as Context>::hash(&bincode::serialize(self).expect("serialize Panorama"))
+    }
+
+    /// Returns the sequence number-based version of this panorama.
+    ///
+    /// Panics if the state doesn't have all cited units.
+    pub(crate) fn to_seq_num_panorama(&self, state: &State<C>) -> ValidatorMap<ObservationSeqNum> {
+        self.iter()
+            .map(|obs| match obs {
+                Observation::None => ObservationSeqNum::None,
+                Observation::Faulty => ObservationSeqNum::Faulty,
+                Observation::Correct(hash) => {
+                    ObservationSeqNum::Correct(state.unit(hash).seq_number)
+                }
+            })
+            .collect()
     }
 
     /// Returns whether `self` can possibly come later in time than `other`, i.e. it can see

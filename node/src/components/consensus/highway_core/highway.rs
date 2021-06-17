@@ -2,7 +2,8 @@ mod vertex;
 
 pub(crate) use crate::components::consensus::highway_core::state::Params;
 pub(crate) use vertex::{
-    Dependency, Endorsements, HashedWireUnit, Ping, SignedWireUnit, Vertex, WireUnit,
+    Dependency, Endorsements, HashedWireUnit, ObservationSeqNum, Ping, SignedWireUnit, Vertex,
+    WireUnit,
 };
 
 use std::path::PathBuf;
@@ -17,7 +18,7 @@ use crate::{
         highway_core::{
             active_validator::{ActiveValidator, Effect},
             evidence::EvidenceError,
-            state::{Fault, State, UnitError, Weight},
+            state::{Fault, Panorama, State, UnitError, Weight},
             validators::{Validator, Validators},
         },
         traits::Context,
@@ -101,7 +102,8 @@ impl<C: Context> From<PreValidatedVertex<C>> for Vertex<C> {
 }
 
 /// A vertex that has been validated: `Highway` has all its dependencies and can add it to its
-/// protocol state.
+/// protocol state. This can never contain the `Unit` variant: It gets replaced with
+/// `UnitWithPanorama`.
 ///
 /// Note that this must only be added to the `Highway` instance that created it. Can cause a panic
 /// or inconsistent state otherwise.
@@ -118,10 +120,18 @@ impl<C: Context> ValidVertex<C> {
     pub(crate) fn is_proposal(&self) -> bool {
         self.0.value().is_some()
     }
+
     pub(crate) fn endorsements(&self) -> Option<&Endorsements<C>> {
         match &self.0 {
             Vertex::Endorsements(endorsements) => Some(endorsements),
-            Vertex::Evidence(_) | Vertex::Unit(_) | Vertex::Ping(_) => None,
+            _ => None,
+        }
+    }
+
+    pub(crate) fn without_panorama(self) -> Vertex<C> {
+        match self.0 {
+            Vertex::UnitWithPanorama(swunit, _) => Vertex::Unit(swunit),
+            vertex => vertex,
         }
     }
 }
@@ -131,7 +141,7 @@ pub(crate) enum GetDepOutcome<C: Context> {
     /// We don't have this dependency.
     None,
     /// This vertex satisfies the dependency.
-    Vertex(ValidVertex<C>),
+    Vertex(Vertex<C>),
     /// The dependency must be satisfied by providing evidence against this faulty validator, but
     /// this `Highway` instance does not have direct evidence.
     Evidence(C::ValidatorId),
@@ -259,15 +269,21 @@ impl<C: Context> Highway<C> {
                     None
                 }
             }
-            Vertex::Unit(unit) => unit
-                .wire_unit()
-                .panorama
-                .missing_dependency(&self.state)
-                .or_else(|| {
+            Vertex::Unit(unit) => {
+                if let Err(dep) = self.state.compute_panorama(unit) {
+                    return Some(dep);
+                }
+                self.state
+                    .needs_endorsements(unit)
+                    .map(Dependency::Endorsement)
+            }
+            Vertex::UnitWithPanorama(unit, panorama) => {
+                panorama.missing_dependency(&self.state).or_else(|| {
                     self.state
                         .needs_endorsements(unit)
                         .map(Dependency::Endorsement)
-                }),
+                })
+            }
         }
     }
 
@@ -278,9 +294,28 @@ impl<C: Context> Highway<C> {
         &self,
         pvv: PreValidatedVertex<C>,
     ) -> Result<ValidVertex<C>, (PreValidatedVertex<C>, VertexError)> {
-        match self.do_validate_vertex(pvv.inner()) {
-            Err(err) => Err((pvv, err)),
-            Ok(()) => Ok(ValidVertex(pvv.0)),
+        match pvv.0 {
+            Vertex::Unit(swunit) => {
+                // TODO: Merge validate_vertex and missing_dependency. Make ValidVertex a separate
+                // enum with only a UnitWithPanorama variant, and none without panorama.
+                let panorama = self
+                    .state
+                    .compute_panorama(&swunit)
+                    .expect("called validate_vertex with missing dependencies");
+                match self.state.validate_unit(&swunit, &panorama) {
+                    Err(err) => Err((PreValidatedVertex(Vertex::Unit(swunit)), err.into())),
+                    Ok(()) => Ok(ValidVertex(Vertex::UnitWithPanorama(swunit, panorama))),
+                }
+            }
+            Vertex::UnitWithPanorama(swunit, panorama) => {
+                let result = self.state.validate_unit(&swunit, &panorama);
+                let vertex = Vertex::UnitWithPanorama(swunit, panorama);
+                match result {
+                    Err(err) => Err((PreValidatedVertex(vertex), err.into())),
+                    Ok(()) => Ok(ValidVertex(vertex)),
+                }
+            }
+            vertex => Ok(ValidVertex(vertex)),
         }
     }
 
@@ -296,7 +331,20 @@ impl<C: Context> Highway<C> {
     ) -> Vec<Effect<C>> {
         if !self.has_vertex(&vertex) {
             match vertex {
-                Vertex::Unit(unit) => self.add_valid_unit(unit, now),
+                Vertex::Unit(unit) => {
+                    // TODO: Merge validate_vertex and missing_dependency. Make ValidVertex a
+                    // separate enum with only a UnitWithPanorama variant, and none without
+                    // panorama.
+                    error!(?unit, "ValidVertex should always include the panorama");
+                    let panorama = self
+                        .state
+                        .compute_panorama(&unit)
+                        .expect("called add_valid_vertex with missing dependencies");
+                    self.add_valid_unit(unit, now, panorama)
+                }
+                Vertex::UnitWithPanorama(unit, panorama) => {
+                    self.add_valid_unit(unit, now, panorama)
+                }
                 Vertex::Evidence(evidence) => self.add_evidence(evidence),
                 Vertex::Endorsements(endorsements) => self.add_endorsements(endorsements),
                 Vertex::Ping(ping) => self.add_ping(ping),
@@ -309,7 +357,9 @@ impl<C: Context> Highway<C> {
     /// Returns whether the vertex is already part of this protocol state.
     pub(crate) fn has_vertex(&self, vertex: &Vertex<C>) -> bool {
         match vertex {
-            Vertex::Unit(unit) => self.state.has_unit(&unit.hash()),
+            Vertex::Unit(unit) | Vertex::UnitWithPanorama(unit, _) => {
+                self.state.has_unit(&unit.hash())
+            }
             Vertex::Evidence(evidence) => self.state.has_evidence(evidence.perpetrator()),
             Vertex::Endorsements(endorsements) => {
                 let unit = endorsements.unit();
@@ -335,12 +385,29 @@ impl<C: Context> Highway<C> {
     }
 
     /// Returns whether we have a vertex that satisfies the dependency.
-    pub(crate) fn has_dependency(&self, dependency: &Dependency<C>) -> bool {
+    ///
+    /// If the dependency is specified by sequence number and we have a matching unit, `None` is
+    /// returned: In that case we cannot be sure whether it is the correct one.
+    pub(crate) fn has_dependency(&self, dependency: &Dependency<C>) -> Option<bool> {
         match dependency {
-            Dependency::Unit(hash) => self.state.has_unit(hash),
-            Dependency::Evidence(idx) => self.state.is_faulty(*idx),
-            Dependency::Endorsement(hash) => self.state.is_endorsed(hash),
-            Dependency::Ping(_, _) => false, // We don't store signatures; nothing depends on pings.
+            Dependency::Unit(hash) | Dependency::UnitWithPanorama(hash) => {
+                Some(self.state.has_unit(hash))
+            }
+            Dependency::UnitBySeqNum(seq_num, vidx) => {
+                if self.validators.id(*vidx).is_none() {
+                    return Some(false);
+                }
+                if let Some(hash) = self.state.maybe_latest_unit(*vidx) {
+                    if self.state.unit(hash).seq_number >= *seq_num {
+                        return None;
+                    }
+                }
+                Some(false)
+            }
+            Dependency::Evidence(idx) => Some(self.state.is_faulty(*idx)),
+            Dependency::Endorsement(hash) => Some(self.state.is_endorsed(hash)),
+            // We don't store signatures; nothing depends on pings.
+            Dependency::Ping(_, _) => Some(false),
         }
     }
 
@@ -352,13 +419,26 @@ impl<C: Context> Highway<C> {
         match dependency {
             Dependency::Unit(hash) => match self.state.wire_unit(hash, self.instance_id) {
                 None => GetDepOutcome::None,
-                Some(unit) => GetDepOutcome::Vertex(ValidVertex(Vertex::Unit(unit))),
+                Some(swunit) => GetDepOutcome::Vertex(Vertex::Unit(swunit)),
             },
+            Dependency::UnitWithPanorama(hash) => self
+                .state
+                .wire_unit(hash, self.instance_id)
+                .map_or(GetDepOutcome::None, |swunit| {
+                    let panorama = self.state.unit(hash).panorama.clone();
+                    GetDepOutcome::Vertex(Vertex::UnitWithPanorama(swunit, panorama))
+                }),
+            Dependency::UnitBySeqNum(seq_num, vidx) => self
+                .state
+                .maybe_latest_unit(*vidx)
+                .and_then(|hash| self.state.find_in_swimlane(hash, *seq_num))
+                .and_then(|hash| self.state.wire_unit(hash, self.instance_id))
+                .map_or(GetDepOutcome::None, |wunit| {
+                    GetDepOutcome::Vertex(Vertex::Unit(wunit))
+                }),
             Dependency::Evidence(idx) => match self.state.maybe_fault(*idx) {
                 None | Some(Fault::Banned) => GetDepOutcome::None,
-                Some(Fault::Direct(ev)) => {
-                    GetDepOutcome::Vertex(ValidVertex(Vertex::Evidence(ev.clone())))
-                }
+                Some(Fault::Direct(ev)) => GetDepOutcome::Vertex(Vertex::Evidence(ev.clone())),
                 Some(Fault::Indirect) => {
                     let vid = self.validators.id(*idx).expect("missing validator").clone();
                     GetDepOutcome::Evidence(vid)
@@ -366,7 +446,7 @@ impl<C: Context> Highway<C> {
             },
             Dependency::Endorsement(hash) => match self.state.maybe_endorsements(hash) {
                 None => GetDepOutcome::None,
-                Some(e) => GetDepOutcome::Vertex(ValidVertex(Vertex::Endorsements(e))),
+                Some(e) => GetDepOutcome::Vertex(Vertex::Endorsements(e)),
             },
             Dependency::Ping(_, _) => GetDepOutcome::None, // We don't store ping signatures.
         }
@@ -527,7 +607,18 @@ impl<C: Context> Highway<C> {
                 if !C::verify_signature(&unit.hash(), v_id, &unit.signature) {
                     return Err(UnitError::Signature.into());
                 }
-                Ok(self.state.pre_validate_unit(unit)?)
+                Ok(self.state.pre_validate_unit(unit, None)?)
+            }
+            Vertex::UnitWithPanorama(unit, panorama) => {
+                let creator = unit.wire_unit().creator;
+                let v_id = self.validators.id(creator).ok_or(UnitError::Creator)?;
+                if unit.wire_unit().instance_id != self.instance_id {
+                    return Err(UnitError::InstanceId.into());
+                }
+                if !C::verify_signature(&unit.hash(), v_id, &unit.signature) {
+                    return Err(UnitError::Signature.into());
+                }
+                Ok(self.state.pre_validate_unit(unit, Some(panorama))?)
             }
             Vertex::Evidence(evidence) => {
                 Ok(evidence.validate(&self.validators, &self.instance_id, self.state.params())?)
@@ -556,15 +647,6 @@ impl<C: Context> Highway<C> {
         }
     }
 
-    /// Validates `vertex` and returns an error if it is invalid.
-    /// This requires all dependencies to be present.
-    fn do_validate_vertex(&self, vertex: &Vertex<C>) -> Result<(), VertexError> {
-        match vertex {
-            Vertex::Unit(unit) => Ok(self.state.validate_unit(unit)?),
-            Vertex::Evidence(_) | Vertex::Endorsements(_) | Vertex::Ping(_) => Ok(()),
-        }
-    }
-
     /// Adds evidence to the protocol state.
     /// Gossip the evidence if it's the first equivocation from the creator.
     fn add_evidence(&mut self, evidence: Evidence<C>) -> Vec<Effect<C>> {
@@ -579,11 +661,16 @@ impl<C: Context> Highway<C> {
     ///
     /// Validity must be checked before calling this! Adding an invalid unit will result in a panic
     /// or an inconsistent state.
-    fn add_valid_unit(&mut self, swunit: SignedWireUnit<C>, now: Timestamp) -> Vec<Effect<C>> {
+    fn add_valid_unit(
+        &mut self,
+        swunit: SignedWireUnit<C>,
+        now: Timestamp,
+        panorama: Panorama<C>,
+    ) -> Vec<Effect<C>> {
         let unit_hash = swunit.hash();
         let creator = swunit.wire_unit().creator;
         let was_honest = !self.state.is_faulty(creator);
-        self.state.add_valid_unit(swunit);
+        self.state.add_valid_unit(swunit, panorama);
         self.log_if_missing_proposal(&unit_hash);
         let mut evidence_effects = self
             .state
@@ -608,8 +695,11 @@ impl<C: Context> Highway<C> {
         self.map_active_validator(
             |av, state| {
                 if av.is_own_last_unit_panorama_sync(state) {
-                    if let Some(own_last_unit) = av.take_own_last_unit() {
-                        vec![Effect::NewVertex(ValidVertex(Vertex::Unit(own_last_unit)))]
+                    if let Some((own_last_unit, panorama)) = av.take_own_last_unit() {
+                        vec![Effect::NewVertex(ValidVertex(Vertex::UnitWithPanorama(
+                            own_last_unit,
+                            panorama,
+                        )))]
                     } else {
                         vec![]
                     }
@@ -766,8 +856,13 @@ pub(crate) mod tests {
             state,
             active_validator: None,
         };
+        let panorama = Panorama::new(WEIGHTS.len());
+        let panorama_hash = panorama.hash();
+        let seq_num_panorama = panorama.to_seq_num_panorama(highway.state());
         let wunit = WireUnit {
-            panorama: Panorama::new(WEIGHTS.len()),
+            seq_num_panorama,
+            panorama_hash,
+            previous: None,
             creator: CAROL,
             instance_id: highway.instance_id,
             value: Some(0),
@@ -828,11 +923,21 @@ pub(crate) mod tests {
         let pvv_a = highway.pre_validate_vertex(Vertex::Unit(wunit_a)).unwrap();
         let pvv_end_a = highway.pre_validate_vertex(vertex_end_a).unwrap();
         let pvv_ev_c = highway.pre_validate_vertex(Vertex::Evidence(ev_c)).unwrap();
-        let pvv_b = highway.pre_validate_vertex(Vertex::Unit(wunit_b)).unwrap();
+        let pvv_b = highway
+            .pre_validate_vertex(Vertex::Unit(wunit_b.clone()))
+            .unwrap();
+        let b_panorama = state.unit(&b).panorama.clone();
+        let pvv_b_with_panorama = highway
+            .pre_validate_vertex(Vertex::UnitWithPanorama(wunit_b, b_panorama))
+            .unwrap();
 
         assert_eq!(
-            Some(Dependency::Unit(a)),
+            Some(Dependency::UnitBySeqNum(0, ALICE)), // Requesting `a` by sequence number.
             highway.missing_dependency(&pvv_b)
+        );
+        assert_eq!(
+            Some(Dependency::Unit(a)), // Requesting `a` by hash.
+            highway.missing_dependency(&pvv_b_with_panorama)
         );
         assert_eq!(
             Some(Dependency::Unit(a)),
@@ -847,6 +952,10 @@ pub(crate) mod tests {
             Some(Dependency::Evidence(CAROL)),
             highway.missing_dependency(&pvv_b)
         );
+        assert_eq!(
+            Some(Dependency::Evidence(CAROL)),
+            highway.missing_dependency(&pvv_b_with_panorama)
+        );
         assert_eq!(None, highway.missing_dependency(&pvv_ev_c));
         let vv_ev_c = highway.validate_vertex(pvv_ev_c).unwrap();
         highway.add_valid_vertex(vv_ev_c, now);
@@ -855,12 +964,17 @@ pub(crate) mod tests {
             Some(Dependency::Endorsement(a)),
             highway.missing_dependency(&pvv_b)
         );
+        assert_eq!(
+            Some(Dependency::Endorsement(a)),
+            highway.missing_dependency(&pvv_b_with_panorama)
+        );
         assert_eq!(None, highway.missing_dependency(&pvv_end_a));
         let vv_end_a = highway.validate_vertex(pvv_end_a).unwrap();
         highway.add_valid_vertex(vv_end_a, now);
 
         assert_eq!(None, highway.missing_dependency(&pvv_b));
         let vv_b = highway.validate_vertex(pvv_b).unwrap();
+        assert_eq!(vv_b, highway.validate_vertex(pvv_b_with_panorama).unwrap());
         highway.add_valid_vertex(vv_b, now);
 
         Ok(())
@@ -895,8 +1009,13 @@ pub(crate) mod tests {
         };
 
         // Two units with different values and the same sequence number. Carol equivocated!
+        let panorama = Panorama::new(WEIGHTS.len());
+        let panorama_hash = panorama.hash();
+        let seq_num_panorama = panorama.to_seq_num_panorama(highway.state());
         let mut wunit0 = WireUnit {
-            panorama: Panorama::new(WEIGHTS.len()),
+            seq_num_panorama: seq_num_panorama.clone(),
+            panorama_hash,
+            previous: None,
             creator: CAROL,
             instance_id: highway.instance_id,
             value: Some(0),
@@ -906,7 +1025,9 @@ pub(crate) mod tests {
             endorsed: BTreeSet::new(),
         };
         let wunit1 = WireUnit {
-            panorama: Panorama::new(WEIGHTS.len()),
+            seq_num_panorama,
+            panorama_hash,
+            previous: None,
             creator: CAROL,
             instance_id: highway.instance_id,
             value: Some(1),

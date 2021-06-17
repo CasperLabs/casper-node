@@ -10,7 +10,7 @@ use crate::{
             evidence::Evidence,
             highway::{PingError, VertexError},
             state::{self, Panorama},
-            validators::{ValidatorIndex, Validators},
+            validators::{ValidatorIndex, ValidatorMap, Validators},
         },
         traits::{Context, ValidatorSecret},
     },
@@ -28,6 +28,10 @@ where
     C: Context,
 {
     Unit(C::Hash),
+    /// The unit with its full panorama.
+    UnitWithPanorama(C::Hash),
+    /// A unit specified by sequence number and validator index.
+    UnitBySeqNum(u64, ValidatorIndex),
     Evidence(ValidatorIndex),
     Endorsement(C::Hash),
     Ping(ValidatorIndex, Timestamp),
@@ -37,6 +41,16 @@ impl<C: Context> Dependency<C> {
     /// Returns whether this identifies a unit, as opposed to other types of vertices.
     pub(crate) fn is_unit(&self) -> bool {
         matches!(self, Dependency::Unit(_))
+    }
+
+    /// Returns `true` if both refer to the same vertex, even if they differ in whether they
+    /// include the panorama.
+    pub(crate) fn matches(&self, other: &Dependency<C>) -> bool {
+        match (self, other) {
+            (Dependency::UnitWithPanorama(hash0), Dependency::Unit(hash1))
+            | (Dependency::Unit(hash0), Dependency::UnitWithPanorama(hash1)) => hash0 == hash1,
+            (dep0, dep1) => dep0 == dep1,
+        }
     }
 }
 
@@ -53,6 +67,7 @@ where
     C: Context,
 {
     Unit(SignedWireUnit<C>),
+    UnitWithPanorama(SignedWireUnit<C>, Panorama<C>),
     Evidence(Evidence<C>),
     Endorsements(Endorsements<C>),
     Ping(Ping<C>),
@@ -67,7 +82,9 @@ impl<C: Context> Vertex<C> {
     /// obtained _and_ validated. Only after that, the vertex can be considered valid.
     pub(crate) fn value(&self) -> Option<&C::ConsensusValue> {
         match self {
-            Vertex::Unit(swunit) => swunit.wire_unit().value.as_ref(),
+            Vertex::Unit(swunit) | Vertex::UnitWithPanorama(swunit, _) => {
+                swunit.wire_unit().value.as_ref()
+            }
             Vertex::Evidence(_) | Vertex::Endorsements(_) | Vertex::Ping(_) => None,
         }
     }
@@ -75,7 +92,7 @@ impl<C: Context> Vertex<C> {
     /// Returns the unit hash of this vertex (if it is a unit).
     pub(crate) fn unit_hash(&self) -> Option<C::Hash> {
         match self {
-            Vertex::Unit(swunit) => Some(swunit.hash()),
+            Vertex::Unit(swunit) | Vertex::UnitWithPanorama(swunit, _) => Some(swunit.hash()),
             Vertex::Evidence(_) | Vertex::Endorsements(_) | Vertex::Ping(_) => None,
         }
     }
@@ -96,7 +113,9 @@ impl<C: Context> Vertex<C> {
     /// Returns a `Timestamp` provided the vertex is a `Vertex::Unit` or `Vertex::Ping`.
     pub(crate) fn timestamp(&self) -> Option<Timestamp> {
         match self {
-            Vertex::Unit(signed_wire_unit) => Some(signed_wire_unit.wire_unit().timestamp),
+            Vertex::Unit(signed_wire_unit) | Vertex::UnitWithPanorama(signed_wire_unit, _) => {
+                Some(signed_wire_unit.wire_unit().timestamp)
+            }
             Vertex::Ping(ping) => Some(ping.timestamp()),
             Vertex::Evidence(_) | Vertex::Endorsements(_) => None,
         }
@@ -104,7 +123,9 @@ impl<C: Context> Vertex<C> {
 
     pub(crate) fn creator(&self) -> Option<ValidatorIndex> {
         match self {
-            Vertex::Unit(signed_wire_unit) => Some(signed_wire_unit.wire_unit().creator),
+            Vertex::Unit(signed_wire_unit) | Vertex::UnitWithPanorama(signed_wire_unit, _) => {
+                Some(signed_wire_unit.wire_unit().creator)
+            }
             Vertex::Ping(ping) => Some(ping.creator),
             Vertex::Evidence(_) | Vertex::Endorsements(_) => None,
         }
@@ -113,6 +134,9 @@ impl<C: Context> Vertex<C> {
     pub(crate) fn id(&self) -> Dependency<C> {
         match self {
             Vertex::Unit(signed_wire_unit) => Dependency::Unit(signed_wire_unit.hash()),
+            Vertex::UnitWithPanorama(signed_wire_unit, _) => {
+                Dependency::UnitWithPanorama(signed_wire_unit.hash())
+            }
             Vertex::Evidence(evidence) => Dependency::Evidence(evidence.perpetrator()),
             Vertex::Endorsements(endorsement) => Dependency::Endorsement(endorsement.unit),
             Vertex::Ping(ping) => Dependency::Ping(ping.creator(), ping.timestamp()),
@@ -212,6 +236,41 @@ impl<'de, C: Context> Deserialize<'de> for HashedWireUnit<C> {
     }
 }
 
+/// An entry in a sequence number-based panorama.
+#[derive(Debug, Clone, DataSize, Eq, PartialEq, Hash)]
+pub(crate) enum ObservationSeqNum {
+    Correct(u64),
+    Faulty,
+    None,
+}
+
+impl ObservationSeqNum {
+    pub(crate) fn is_correct(&self) -> bool {
+        matches!(self, ObservationSeqNum::Correct(_))
+    }
+}
+
+impl Serialize for ObservationSeqNum {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match self {
+            ObservationSeqNum::Correct(seq_num) => seq_num.saturating_add(1),
+            ObservationSeqNum::Faulty => u64::MAX,
+            ObservationSeqNum::None => 0,
+        }
+        .serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for ObservationSeqNum {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        Ok(match u64::deserialize(deserializer)? {
+            0 => ObservationSeqNum::None,
+            u64::MAX => ObservationSeqNum::Faulty,
+            sn_plus_1 => ObservationSeqNum::Correct(sn_plus_1.saturating_sub(1)),
+        })
+    }
+}
+
 /// A unit as it is sent over the wire, possibly containing a new block.
 #[derive(Clone, DataSize, Eq, PartialEq, Serialize, Deserialize, Hash)]
 #[serde(bound(
@@ -222,7 +281,9 @@ pub(crate) struct WireUnit<C>
 where
     C: Context,
 {
-    pub(crate) panorama: Panorama<C>,
+    pub(crate) seq_num_panorama: ValidatorMap<ObservationSeqNum>,
+    pub(crate) panorama_hash: C::Hash,
+    pub(crate) previous: Option<C::Hash>,
     pub(crate) creator: ValidatorIndex,
     pub(crate) instance_id: C::InstanceId,
     pub(crate) value: Option<C::ConsensusValue>,
@@ -249,7 +310,7 @@ impl<C: Context> Debug for WireUnit<C> {
             .field("instance_id", &self.instance_id)
             .field("seq_number", &self.seq_number)
             .field("timestamp", &self.timestamp.millis())
-            .field("panorama", self.panorama.as_ref())
+            .field("previous", &self.previous)
             .field("round_exp", &self.round_exp)
             .field("endorsed", &self.endorsed)
             .field("round_id()", &self.round_id())
@@ -269,7 +330,7 @@ impl<C: Context> WireUnit<C> {
 
     /// Returns the creator's previous unit.
     pub(crate) fn previous(&self) -> Option<&C::Hash> {
-        self.panorama[self.creator].correct()
+        self.previous.as_ref()
     }
 
     /// Returns the unit's hash, which is used as a unit identifier.
@@ -384,5 +445,24 @@ impl<C: Context> Ping<C> {
     fn hash(creator: ValidatorIndex, timestamp: Timestamp, instance_id: C::InstanceId) -> C::Hash {
         let bytes = bincode::serialize(&(creator, timestamp, instance_id)).expect("serialize Ping");
         <C as Context>::hash(&bytes)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn serde_observation_seq_num() {
+        fn test_roundtrip(obs: ObservationSeqNum) {
+            let serialized = bincode::serialize(&obs).expect("serialize");
+            let deserialized = bincode::deserialize(&serialized).expect("deserialize");
+            assert_eq!(obs, deserialized);
+        }
+
+        test_roundtrip(ObservationSeqNum::None);
+        test_roundtrip(ObservationSeqNum::Faulty);
+        test_roundtrip(ObservationSeqNum::Correct(0));
+        test_roundtrip(ObservationSeqNum::Correct(10));
     }
 }
