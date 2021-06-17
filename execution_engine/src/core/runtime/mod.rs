@@ -2519,8 +2519,7 @@ where
         let transfer = {
             let deploy_hash: DeployHash = self.context.get_deploy_hash();
             let from: AccountHash = self.context.account().account_hash();
-            let fee: U512 = U512::zero(); // TODO
-            Transfer::new(deploy_hash, from, maybe_to, source, target, amount, fee, id)
+            Transfer::new(deploy_hash, from, maybe_to, source, target, amount, id)
         };
         {
             let transfers = self.context.transfers_mut();

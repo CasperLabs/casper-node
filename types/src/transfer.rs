@@ -116,21 +116,19 @@ impl Distribution<DeployHash> for Standard {
 #[serde(deny_unknown_fields)]
 pub struct Transfer {
     /// Deploy that created the transfer
-    pub deploy_hash: DeployHash,
+    deploy_hash: DeployHash,
     /// Account from which transfer was executed
-    pub from: AccountHash,
+    from: AccountHash,
     /// Account to which funds are transferred
-    pub to: Option<AccountHash>,
+    to: Option<AccountHash>,
     /// Source purse
-    pub source: URef,
+    source: URef,
     /// Target purse
-    pub target: URef,
+    target: URef,
     /// Transfer amount
-    pub amount: U512,
-    /// Gas
-    pub gas: U512,
+    amount: U512,
     /// User-defined id
-    pub id: Option<u64>,
+    id: Option<u64>,
 }
 
 impl Transfer {
@@ -143,7 +141,6 @@ impl Transfer {
         source: URef,
         target: URef,
         amount: U512,
-        gas: U512,
         id: Option<u64>,
     ) -> Self {
         Transfer {
@@ -153,9 +150,43 @@ impl Transfer {
             source,
             target,
             amount,
-            gas,
             id,
         }
+    }
+
+    /// Returns deploy that created the transfer
+    pub fn deploy_hash(&self) -> &DeployHash {
+        &self.deploy_hash
+    }
+
+    /// Returns account from which transfer was executed
+    pub fn from(&self) -> &AccountHash {
+        &self.from
+    }
+
+    /// Returns account to which funds are transferred
+    pub fn to(&self) -> &Option<AccountHash> {
+        &self.to
+    }
+
+    /// Returns source purse
+    pub fn source(&self) -> &URef {
+        &self.source
+    }
+
+    /// Returns target purse
+    pub fn target(&self) -> &URef {
+        &self.target
+    }
+
+    /// Returns transfer amount
+    pub fn amount(&self) -> &U512 {
+        &self.amount
+    }
+
+    /// Returns user-defined id
+    pub fn id(&self) -> &Option<u64> {
+        &self.id
     }
 }
 
@@ -167,7 +198,7 @@ impl FromBytes for Transfer {
         let (source, rem) = URef::from_bytes(rem)?;
         let (target, rem) = URef::from_bytes(rem)?;
         let (amount, rem) = U512::from_bytes(rem)?;
-        let (gas, rem) = U512::from_bytes(rem)?;
+        let (_reserved_u512, rem) = U512::from_bytes(rem)?;
         let (id, rem) = <Option<u64>>::from_bytes(rem)?;
         Ok((
             Transfer {
@@ -177,7 +208,6 @@ impl FromBytes for Transfer {
                 source,
                 target,
                 amount,
-                gas,
                 id,
             },
             rem,
@@ -187,6 +217,8 @@ impl FromBytes for Transfer {
 
 impl ToBytes for Transfer {
     fn to_bytes(&self) -> Result<Vec<u8>, bytesrepr::Error> {
+        let reserved_u512 = U512::zero();
+
         let mut result = bytesrepr::allocate_buffer(self)?;
         result.append(&mut self.deploy_hash.to_bytes()?);
         result.append(&mut self.from.to_bytes()?);
@@ -194,19 +226,21 @@ impl ToBytes for Transfer {
         result.append(&mut self.source.to_bytes()?);
         result.append(&mut self.target.to_bytes()?);
         result.append(&mut self.amount.to_bytes()?);
-        result.append(&mut self.gas.to_bytes()?);
+        result.append(&mut reserved_u512.to_bytes()?);
         result.append(&mut self.id.to_bytes()?);
         Ok(result)
     }
 
     fn serialized_length(&self) -> usize {
+        let reserved_u512 = U512::zero();
+
         self.deploy_hash.serialized_length()
             + self.from.serialized_length()
             + self.to.serialized_length()
             + self.source.serialized_length()
             + self.target.serialized_length()
             + self.amount.serialized_length()
-            + self.gas.serialized_length()
+            + reserved_u512.serialized_length()
             + self.id.serialized_length()
     }
 }
@@ -411,20 +445,10 @@ pub mod gens {
             uref_arb(),
             uref_arb(),
             u512_arb(),
-            u512_arb(),
             option::of(<u64>::arbitrary()),
         )
-            .prop_map(|(deploy_hash, from, to, source, target, amount, gas, id)| {
-                Transfer {
-                    deploy_hash,
-                    from,
-                    to,
-                    source,
-                    target,
-                    amount,
-                    gas,
-                    id,
-                }
+            .prop_map(|(deploy_hash, from, to, source, target, amount, id)| {
+                Transfer::new(deploy_hash, from, to, source, target, amount, id)
             })
     }
 }

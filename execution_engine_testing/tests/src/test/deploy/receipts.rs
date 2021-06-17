@@ -104,14 +104,13 @@ fn should_record_wasmless_transfer() {
         .get_transfer(transfers[0])
         .expect("should have transfer");
 
-    assert_eq!(transfer.deploy_hash, deploy_hash);
-    assert_eq!(transfer.from, *DEFAULT_ACCOUNT_ADDR);
-    assert_eq!(transfer.to, Some(*ALICE_ADDR));
-    assert_eq!(transfer.source, default_account.main_purse());
-    assert_eq!(transfer.target, alice_attenuated_main_purse);
-    assert_eq!(transfer.amount, *TRANSFER_AMOUNT_1);
-    assert_eq!(transfer.gas, U512::zero());
-    assert_eq!(transfer.id, id);
+    assert_eq!(transfer.deploy_hash(), &deploy_hash);
+    assert_eq!(transfer.from(), &*DEFAULT_ACCOUNT_ADDR);
+    assert_eq!(transfer.to(), &Some(*ALICE_ADDR));
+    assert_eq!(transfer.source(), &default_account.main_purse());
+    assert_eq!(transfer.target(), &alice_attenuated_main_purse);
+    assert_eq!(transfer.amount(), &*TRANSFER_AMOUNT_1);
+    assert_eq!(transfer.id(), &id);
 }
 
 #[ignore]
@@ -169,12 +168,11 @@ fn should_record_wasm_transfer() {
         .get_transfer(transfers[0])
         .expect("should have transfer");
 
-    assert_eq!(transfer.deploy_hash, deploy_hash);
-    assert_eq!(transfer.from, *DEFAULT_ACCOUNT_ADDR);
-    assert_eq!(transfer.source, default_account.main_purse());
-    assert_eq!(transfer.target, alice_attenuated_main_purse);
-    assert_eq!(transfer.amount, *TRANSFER_AMOUNT_1);
-    assert_eq!(transfer.gas, U512::zero()) // TODO
+    assert_eq!(transfer.deploy_hash(), &deploy_hash);
+    assert_eq!(transfer.from(), &*DEFAULT_ACCOUNT_ADDR);
+    assert_eq!(transfer.source(), &default_account.main_purse());
+    assert_eq!(transfer.target(), &alice_attenuated_main_purse);
+    assert_eq!(transfer.amount(), &*TRANSFER_AMOUNT_1);
 }
 
 #[ignore]
@@ -235,13 +233,12 @@ fn should_record_wasm_transfer_with_id() {
         .get_transfer(transfers[0])
         .expect("should have transfer");
 
-    assert_eq!(transfer.deploy_hash, deploy_hash);
-    assert_eq!(transfer.from, *DEFAULT_ACCOUNT_ADDR);
-    assert_eq!(transfer.source, default_account.main_purse());
-    assert_eq!(transfer.target, alice_attenuated_main_purse);
-    assert_eq!(transfer.amount, *TRANSFER_AMOUNT_1);
-    assert_eq!(transfer.gas, U512::zero()); // TODO
-    assert_eq!(transfer.id, id);
+    assert_eq!(transfer.deploy_hash(), &deploy_hash);
+    assert_eq!(transfer.from(), &*DEFAULT_ACCOUNT_ADDR);
+    assert_eq!(transfer.source(), &default_account.main_purse());
+    assert_eq!(transfer.target(), &alice_attenuated_main_purse);
+    assert_eq!(transfer.amount(), &*TRANSFER_AMOUNT_1);
+    assert_eq!(transfer.id(), &id);
 }
 
 #[ignore]
@@ -349,38 +346,35 @@ fn should_record_wasm_transfers() {
 
     assert_eq!(transfers.len(), EXPECTED_LENGTH);
 
-    assert!(transfers.contains(&Transfer {
+    assert!(transfers.contains(&Transfer::new(
         deploy_hash,
-        from: *DEFAULT_ACCOUNT_ADDR,
-        to: Some(*ALICE_ADDR),
-        source: default_account.main_purse(),
-        target: alice_attenuated_main_purse,
-        amount: *TRANSFER_AMOUNT_1,
-        gas: U512::zero(),
-        id: alice_id,
-    }));
+        *DEFAULT_ACCOUNT_ADDR,
+        Some(*ALICE_ADDR),
+        default_account.main_purse(),
+        alice_attenuated_main_purse,
+        *TRANSFER_AMOUNT_1,
+        alice_id,
+    )));
 
-    assert!(transfers.contains(&Transfer {
+    assert!(transfers.contains(&Transfer::new(
         deploy_hash,
-        from: *DEFAULT_ACCOUNT_ADDR,
-        to: Some(*BOB_ADDR),
-        source: default_account.main_purse(),
-        target: bob_attenuated_main_purse,
-        amount: *TRANSFER_AMOUNT_2,
-        gas: U512::zero(),
-        id: bob_id,
-    }));
+        *DEFAULT_ACCOUNT_ADDR,
+        Some(*BOB_ADDR),
+        default_account.main_purse(),
+        bob_attenuated_main_purse,
+        *TRANSFER_AMOUNT_2,
+        bob_id,
+    )));
 
-    assert!(transfers.contains(&Transfer {
+    assert!(transfers.contains(&Transfer::new(
         deploy_hash,
-        from: *DEFAULT_ACCOUNT_ADDR,
-        to: Some(*CAROL_ADDR),
-        source: default_account.main_purse(),
-        target: carol_attenuated_main_purse,
-        amount: *TRANSFER_AMOUNT_3,
-        gas: U512::zero(),
-        id: carol_id,
-    }));
+        *DEFAULT_ACCOUNT_ADDR,
+        Some(*CAROL_ADDR),
+        default_account.main_purse(),
+        carol_attenuated_main_purse,
+        *TRANSFER_AMOUNT_3,
+        carol_id,
+    )));
 }
 
 #[ignore]
@@ -490,38 +484,35 @@ fn should_record_wasm_transfers_with_subcall() {
         tmp
     };
 
-    let expected_alice = Transfer {
-        deploy_hash: transfer_deploy_hash,
-        from: *DEFAULT_ACCOUNT_ADDR,
-        to: Some(*ALICE_ADDR),
-        source: default_account.main_purse(),
-        target: alice_attenuated_main_purse,
-        amount: *TRANSFER_AMOUNT_1,
-        gas: U512::zero(),
-        id: alice_id,
-    };
+    let expected_alice = Transfer::new(
+        transfer_deploy_hash,
+        *DEFAULT_ACCOUNT_ADDR,
+        Some(*ALICE_ADDR),
+        default_account.main_purse(),
+        alice_attenuated_main_purse,
+        *TRANSFER_AMOUNT_1,
+        alice_id,
+    );
 
-    let expected_bob = Transfer {
-        deploy_hash: transfer_deploy_hash,
-        from: *DEFAULT_ACCOUNT_ADDR,
-        to: Some(*BOB_ADDR),
-        source: default_account.main_purse(),
-        target: bob_attenuated_main_purse,
-        amount: *TRANSFER_AMOUNT_2,
-        gas: U512::zero(),
-        id: bob_id,
-    };
+    let expected_bob = Transfer::new(
+        transfer_deploy_hash,
+        *DEFAULT_ACCOUNT_ADDR,
+        Some(*BOB_ADDR),
+        default_account.main_purse(),
+        bob_attenuated_main_purse,
+        *TRANSFER_AMOUNT_2,
+        bob_id,
+    );
 
-    let expected_carol = Transfer {
-        deploy_hash: transfer_deploy_hash,
-        from: *DEFAULT_ACCOUNT_ADDR,
-        to: Some(*CAROL_ADDR),
-        source: default_account.main_purse(),
-        target: carol_attenuated_main_purse,
-        amount: *TRANSFER_AMOUNT_3,
-        gas: U512::zero(),
-        id: carol_id,
-    };
+    let expected_carol = Transfer::new(
+        transfer_deploy_hash,
+        *DEFAULT_ACCOUNT_ADDR,
+        Some(*CAROL_ADDR),
+        default_account.main_purse(),
+        carol_attenuated_main_purse,
+        *TRANSFER_AMOUNT_3,
+        carol_id,
+    );
 
     const EXPECTED_COUNT: Option<usize> = Some(2);
     for expected in &[expected_alice, expected_bob, expected_carol] {
