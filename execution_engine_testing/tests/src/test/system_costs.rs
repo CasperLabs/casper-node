@@ -12,12 +12,13 @@ use casper_engine_test_support::{
 use casper_execution_engine::{
     core::engine_state::{genesis::GenesisValidator, GenesisAccount},
     shared::{
+        core_config::CoreConfig,
         gas::Gas,
         host_function_costs::{Cost, HostFunction, HostFunctionCosts},
         motes::Motes,
         opcode_costs::OpcodeCosts,
         storage_costs::StorageCosts,
-        system_config::{
+        system_costs::{
             auction_costs::{
                 AuctionCosts, DEFAULT_ADD_BID_COST, DEFAULT_DELEGATE_COST, DEFAULT_DISTRIBUTE_COST,
                 DEFAULT_RUN_AUCTION_COST, DEFAULT_SLASH_COST, DEFAULT_UNDELEGATE_COST,
@@ -31,7 +32,7 @@ use casper_execution_engine::{
                 DEFAULT_REDUCE_TOTAL_SUPPLY_COST, DEFAULT_TRANSFER_COST,
             },
             standard_payment_costs::StandardPaymentCosts,
-            SystemConfig,
+            SystemCosts,
         },
         wasm,
         wasm_config::{WasmConfig, DEFAULT_MAX_STACK_HEIGHT, DEFAULT_WASM_MAX_MEMORY},
@@ -182,7 +183,7 @@ fn upgraded_add_bid_and_withdraw_bid_have_expected_costs() {
     let new_standard_payment_costs = StandardPaymentCosts::default();
     let new_handle_payment_costs = HandlePaymentCosts::default();
 
-    let new_system_config = SystemConfig::new(
+    let new_system_costs = SystemCosts::new(
         new_wasmless_transfer_cost,
         new_auction_costs,
         new_mint_costs,
@@ -198,7 +199,7 @@ fn upgraded_add_bid_and_withdraw_bid_have_expected_costs() {
             .with_current_protocol_version(*OLD_PROTOCOL_VERSION)
             .with_new_protocol_version(*NEW_PROTOCOL_VERSION)
             .with_activation_point(DEFAULT_ACTIVATION_POINT)
-            .with_new_system_config(new_system_config)
+            .with_new_system_costs(new_system_costs)
             .build()
     };
 
@@ -413,7 +414,7 @@ fn upgraded_delegate_and_undelegate_have_expected_costs() {
     let new_standard_payment_costs = StandardPaymentCosts::default();
     let new_handle_payment_costs = HandlePaymentCosts::default();
 
-    let new_system_config = SystemConfig::new(
+    let new_system_costs = SystemCosts::new(
         new_wasmless_transfer_cost,
         new_auction_costs,
         new_mint_costs,
@@ -446,7 +447,7 @@ fn upgraded_delegate_and_undelegate_have_expected_costs() {
             .with_current_protocol_version(*OLD_PROTOCOL_VERSION)
             .with_new_protocol_version(*NEW_PROTOCOL_VERSION)
             .with_activation_point(DEFAULT_ACTIVATION_POINT)
-            .with_new_system_config(new_system_config)
+            .with_new_system_costs(new_system_costs)
             .build()
     };
 
@@ -844,8 +845,9 @@ fn should_verify_wasm_add_bid_wasm_cost_is_not_recursive() {
     let new_mint_costs = MintCosts::default();
     let new_standard_payment_costs = StandardPaymentCosts::default();
     let new_handle_payment_costs = HandlePaymentCosts::default();
+    let new_core_config = CoreConfig::default();
 
-    let new_system_config = SystemConfig::new(
+    let new_system_costs = SystemCosts::new(
         new_wasmless_transfer_cost,
         new_auction_costs,
         new_mint_costs,
@@ -859,7 +861,8 @@ fn should_verify_wasm_add_bid_wasm_cost_is_not_recursive() {
             .with_new_protocol_version(*NEW_PROTOCOL_VERSION)
             .with_activation_point(DEFAULT_ACTIVATION_POINT)
             .with_new_wasm_config(new_wasm_config)
-            .with_new_system_config(new_system_config)
+            .with_new_core_config(new_core_config)
+            .with_new_system_costs(new_system_costs)
             .build()
     };
 

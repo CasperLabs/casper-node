@@ -10,12 +10,13 @@ use rand::RngCore;
 
 use casper_types::{
     account::{
-        AccountHash, ActionType, AddKeyFailure, RemoveKeyFailure, SetThresholdFailure, Weight,
+        AccountHash, AccountHashBytes, ActionType, AddKeyFailure, RemoveKeyFailure,
+        SetThresholdFailure, Weight,
     },
     bytesrepr::ToBytes,
     contracts::NamedKeys,
     AccessRights, BlockTime, CLValue, Contract, DeployHash, EntryPointType, EntryPoints, Key,
-    Phase, ProtocolVersion, RuntimeArgs, URef, KEY_HASH_LENGTH, U512,
+    Phase, ProtocolVersion, PublicKey, RuntimeArgs, SecretKey, URef, KEY_HASH_LENGTH, U256, U512,
 };
 
 use super::{Address, Error, RuntimeContext};
@@ -135,7 +136,7 @@ fn mock_runtime_context<'a>(
         named_keys,
         access_rights,
         RuntimeArgs::new(),
-        BTreeSet::from_iter(vec![AccountHash::new([0; 32])]),
+        BTreeSet::from_iter(vec![account.account_hash()]),
         &account,
         base_key,
         BlockTime::new(0),
@@ -176,8 +177,11 @@ fn test<T, F>(access_rights: HashMap<Address, HashSet<AccessRights>>, query: F) 
 where
     F: FnOnce(RuntimeContext<InMemoryGlobalStateView>) -> Result<T, Error>,
 {
+    let secret_key = SecretKey::ed25519_from_bytes([222; SecretKey::ED25519_LENGTH])
+        .expect("should create secret key");
+    let public_key = PublicKey::from(&secret_key);
     let deploy_hash = [1u8; 32];
-    let (base_key, account) = mock_account(AccountHash::new([0u8; 32]));
+    let (base_key, account) = mock_account(public_key.to_account_hash());
 
     let mut named_keys = NamedKeys::new();
     let uref_address_generator = AddressGenerator::new(&deploy_hash, Phase::Session);
@@ -918,4 +922,31 @@ fn should_meter_for_gas_storage_add() {
     );
 
     assert_eq!(gas_usage_after, gas_usage_before + expected_add_cost);
+}
+
+#[test]
+fn associated_keys_add_full() {
+    let final_add_result = test(Default::default(), |mut rc| {
+        let core_config = rc.protocol_data().core_config();
+
+        let associated_keys_before = rc.account().associated_keys().len();
+
+        for count in 0..(core_config.max_associated_keys() as usize - associated_keys_before) {
+            let account_hash = {
+                let mut addr = AccountHashBytes::default();
+                U256::from(count).to_big_endian(&mut addr);
+                AccountHash::new(addr)
+            };
+            let weight = Weight::new(count as u8);
+            rc.add_associated_key(account_hash, weight)
+                .unwrap_or_else(|e| panic!("should add key {}: {:?}", count, e));
+        }
+
+        rc.add_associated_key(AccountHash::new([42; 32]), Weight::new(42))
+    });
+
+    assert!(matches!(
+        final_add_result.expect_err("should error out"),
+        Error::AddKeyFailure(AddKeyFailure::MaxKeysLimit)
+    ));
 }

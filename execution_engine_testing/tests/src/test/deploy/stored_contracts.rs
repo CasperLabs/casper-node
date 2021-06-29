@@ -586,7 +586,10 @@ fn should_have_equivalent_transforms_with_stored_contract_pointers() {
                 assert_eq!(la.main_purse(), ra.main_purse());
                 assert_eq!(la.action_thresholds(), ra.action_thresholds());
 
-                assert!(Iterator::eq(la.associated_keys(), ra.associated_keys(),));
+                assert!(Iterator::eq(
+                    la.associated_keys().iter(),
+                    ra.associated_keys().iter(),
+                ));
 
                 // la has stored contracts under named urefs
                 assert_ne!(la.named_keys(), ra.named_keys());

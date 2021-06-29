@@ -505,6 +505,12 @@ impl ChainspecLoader {
             previous_version,
             new_version,
             Some(self.chainspec.wasm_config),
+            // TODO: Move all fields
+            Some(
+                casper_execution_engine::shared::core_config::CoreConfig::new(
+                    self.chainspec.core_config.max_associated_keys,
+                ),
+            ),
             Some(self.chainspec.system_costs_config),
             Some(self.chainspec.protocol_config.activation_point.era_id()),
             Some(self.chainspec.core_config.validator_slots),

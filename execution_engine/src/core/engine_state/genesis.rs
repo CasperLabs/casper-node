@@ -44,11 +44,12 @@ use crate::{
     },
     shared::{
         account::Account,
+        core_config::CoreConfig,
         gas::Gas,
         motes::Motes,
         newtypes::{Blake2bHash, CorrelationId},
         stored_value::StoredValue,
-        system_config::SystemConfig,
+        system_costs::SystemCosts,
         wasm_config::WasmConfig,
         TypeMismatch,
     },
@@ -529,7 +530,8 @@ impl Distribution<GenesisConfig> for Standard {
 pub struct ExecConfig {
     accounts: Vec<GenesisAccount>,
     wasm_config: WasmConfig,
-    system_config: SystemConfig,
+    core_config: CoreConfig,
+    system_costs: SystemCosts,
     validator_slots: u32,
     auction_delay: u64,
     locked_funds_period_millis: u64,
@@ -543,7 +545,8 @@ impl ExecConfig {
     pub fn new(
         accounts: Vec<GenesisAccount>,
         wasm_config: WasmConfig,
-        system_config: SystemConfig,
+        core_config: CoreConfig,
+        system_costs: SystemCosts,
         validator_slots: u32,
         auction_delay: u64,
         locked_funds_period_millis: u64,
@@ -554,7 +557,8 @@ impl ExecConfig {
         ExecConfig {
             accounts,
             wasm_config,
-            system_config,
+            core_config,
+            system_costs,
             validator_slots,
             auction_delay,
             locked_funds_period_millis,
@@ -568,8 +572,12 @@ impl ExecConfig {
         &self.wasm_config
     }
 
-    pub fn system_config(&self) -> &SystemConfig {
-        &self.system_config
+    pub fn core_config(&self) -> &CoreConfig {
+        &self.core_config
+    }
+
+    pub fn system_costs(&self) -> &SystemCosts {
+        &self.system_costs
     }
 
     pub fn get_bonded_validators(&self) -> impl Iterator<Item = &GenesisAccount> {
@@ -627,7 +635,9 @@ impl Distribution<ExecConfig> for Standard {
 
         let wasm_config = rng.gen();
 
-        let system_config = rng.gen();
+        let core_config = rng.gen();
+
+        let system_costs = rng.gen();
 
         let validator_slots = rng.gen();
 
@@ -647,7 +657,8 @@ impl Distribution<ExecConfig> for Standard {
         ExecConfig {
             accounts,
             wasm_config,
-            system_config,
+            core_config,
+            system_costs,
             validator_slots,
             auction_delay,
             locked_funds_period_millis,

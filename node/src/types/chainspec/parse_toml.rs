@@ -10,7 +10,7 @@ use std::{convert::TryFrom, path::Path};
 
 use serde::{Deserialize, Serialize};
 
-use casper_execution_engine::shared::{system_config::SystemConfig, wasm_config::WasmConfig};
+use casper_execution_engine::shared::{system_costs::SystemCosts, wasm_config::WasmConfig};
 use casper_types::{EraId, ProtocolVersion};
 
 use super::{
@@ -49,7 +49,7 @@ pub(super) struct TomlChainspec {
     deploys: DeployConfig,
     highway: HighwayConfig,
     wasm: WasmConfig,
-    system_costs: SystemConfig,
+    system_costs: SystemCosts,
 }
 
 impl From<&Chainspec> for TomlChainspec {

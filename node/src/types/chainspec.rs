@@ -22,7 +22,7 @@ use tracing::{error, warn};
 
 use casper_execution_engine::{
     core::engine_state::genesis::ExecConfig,
-    shared::{system_config::SystemConfig, wasm_config::WasmConfig},
+    shared::{system_costs::SystemCosts, wasm_config::WasmConfig},
 };
 use casper_types::{
     bytesrepr::{self, FromBytes, ToBytes},
@@ -64,7 +64,7 @@ pub struct Chainspec {
     #[serde(rename = "wasm")]
     pub(crate) wasm_config: WasmConfig,
     #[serde(rename = "system_costs")]
-    pub(crate) system_costs_config: SystemConfig,
+    pub(crate) system_costs_config: SystemCosts,
 }
 
 impl Chainspec {
@@ -159,7 +159,7 @@ impl FromBytes for Chainspec {
         let (highway_config, remainder) = HighwayConfig::from_bytes(remainder)?;
         let (deploy_config, remainder) = DeployConfig::from_bytes(remainder)?;
         let (wasm_config, remainder) = WasmConfig::from_bytes(remainder)?;
-        let (system_costs_config, remainder) = SystemConfig::from_bytes(remainder)?;
+        let (system_costs_config, remainder) = SystemCosts::from_bytes(remainder)?;
         let chainspec = Chainspec {
             protocol_config,
             network_config,
@@ -186,6 +186,7 @@ impl From<&Chainspec> for ExecConfig {
         ExecConfig::new(
             chainspec.network_config.accounts_config.clone().into(),
             chainspec.wasm_config,
+            chainspec.core_config.into(),
             chainspec.system_costs_config,
             chainspec.core_config.validator_slots,
             chainspec.core_config.auction_delay,

@@ -45,6 +45,8 @@ unbonding_delay = 14
 #
 # (1+0.02)^((2^12)/31536000000)-1 is expressed as a fractional number below.
 round_seigniorage_rate = [15_959, 6_204_824_582_392]
+# Maximum number of associated keys for a single account.
+max_associated_keys = 100
 
 [highway]
 # A number between 0 and 1 representing the fault tolerance threshold as a fraction, used by the internal finalizer.
@@ -136,7 +138,7 @@ regular = 210
 # Host function declarations are located in smart_contracts/contract/src/ext_ffi.rs
 [wasm.host_function_costs]
 add = { cost = 5_800, arguments = [0, 0, 0, 0] }
-add_associated_key = { cost = 9_000, arguments = [0, 0, 0] }
+add_associated_key = { cost = 90_000, arguments = [0, 0, 0] }
 add_contract_version = { cost = 200, arguments = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] }
 blake2b = { cost = 200, arguments = [0, 0, 0, 0] }
 call_contract = { cost = 4_500, arguments = [0, 0, 0, 0, 0, 420, 0] }
@@ -164,7 +166,7 @@ put_key = { cost = 38_000, arguments = [0, 1_100, 0, 0] }
 read_host_buffer = { cost = 3_500, arguments = [0, 310, 0] }
 read_value = { cost = 6_000, arguments = [0, 0, 0] }
 read_value_local = { cost = 5_500, arguments = [0, 590, 0] }
-remove_associated_key = { cost = 4_200, arguments = [0, 0] }
+remove_associated_key = { cost = 42_000, arguments = [0, 0] }
 remove_contract_user_group = { cost = 200, arguments = [0, 0, 0, 0] }
 remove_contract_user_group_urefs = { cost = 200, arguments = [0, 0, 0, 0, 0, 0] }
 remove_key = { cost = 61_000, arguments = [0, 3_200] }
@@ -174,7 +176,7 @@ set_action_threshold = { cost = 74_000, arguments = [0, 0] }
 transfer_from_purse_to_account = { cost = 160_000, arguments = [0, 0, 0, 0, 0, 0, 0, 0, 0] }
 transfer_from_purse_to_purse = { cost = 82_000, arguments = [0, 0, 0, 0, 0, 0, 0, 0] }
 transfer_to_account = { cost = 24_000, arguments = [0, 0, 0, 0, 0, 0, 0] }
-update_associated_key = { cost = 4_200, arguments = [0, 0, 0] }
+update_associated_key = { cost = 42_000, arguments = [0, 0, 0] }
 write = { cost = 14_000, arguments = [0, 0, 0, 980] }
 write_local = { cost = 9_500, arguments = [0, 1_800, 0, 520] }
 delete = { cost = 14_000, arguments = [0, 0] }

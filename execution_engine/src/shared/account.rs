@@ -79,8 +79,8 @@ impl Account {
         URef::new(self.main_purse.addr(), AccessRights::ADD)
     }
 
-    pub fn associated_keys(&self) -> impl Iterator<Item = (&AccountHash, &Weight)> {
-        self.associated_keys.iter()
+    pub fn associated_keys(&self) -> &AssociatedKeys {
+        &self.associated_keys
     }
 
     pub fn action_thresholds(&self) -> &ActionThresholds {

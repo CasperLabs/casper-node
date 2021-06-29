@@ -499,8 +499,8 @@ pub enum ApiError {
     LeftOverBytes,
     /// Out of memory error.
     OutOfMemory,
-    /// There are already [`MAX_ASSOCIATED_KEYS`](crate::account::MAX_ASSOCIATED_KEYS)
-    /// [`AccountHash`](crate::account::AccountHash)s associated with the given account.
+    /// There are already maximum [`AccountHash`](crate::account::AccountHash)s associated with the
+    /// given account.
     MaxKeysLimit,
     /// The given [`AccountHash`](crate::account::AccountHash) is already associated with the given
     /// account.

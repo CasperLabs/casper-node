@@ -13,9 +13,9 @@ use casper_execution_engine::{
     shared::{
         gas::Gas,
         motes::Motes,
-        system_config::{
+        system_costs::{
             auction_costs::AuctionCosts, handle_payment_costs::HandlePaymentCosts,
-            mint_costs::MintCosts, standard_payment_costs::StandardPaymentCosts, SystemConfig,
+            mint_costs::MintCosts, standard_payment_costs::StandardPaymentCosts, SystemCosts,
         },
     },
     storage::protocol_data::DEFAULT_WASMLESS_TRANSFER_COST,
@@ -920,7 +920,7 @@ fn transfer_wasmless_should_observe_upgraded_cost() {
     let new_handle_payment_costs = HandlePaymentCosts::default();
     let new_standard_payment_costs = StandardPaymentCosts::default();
 
-    let new_system_config = SystemConfig::new(
+    let new_system_costs = SystemCosts::new(
         new_wasmless_transfer_cost_value,
         new_auction_costs,
         new_mint_costs,
@@ -947,7 +947,7 @@ fn transfer_wasmless_should_observe_upgraded_cost() {
             .with_current_protocol_version(*DEFAULT_PROTOCOL_VERSION)
             .with_new_protocol_version(new_protocol_version)
             .with_activation_point(DEFAULT_ACTIVATION_POINT)
-            .with_new_system_config(new_system_config)
+            .with_new_system_costs(new_system_costs)
             .build()
     };
 

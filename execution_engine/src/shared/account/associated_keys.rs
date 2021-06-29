@@ -1,11 +1,9 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
 use casper_types::{
-    account::{
-        AccountHash, AddKeyFailure, RemoveKeyFailure, UpdateKeyFailure, Weight, MAX_ASSOCIATED_KEYS,
-    },
+    account::{AccountHash, AddKeyFailure, RemoveKeyFailure, UpdateKeyFailure, Weight},
     bytesrepr::{Error, FromBytes, ToBytes},
 };
 
@@ -21,16 +19,14 @@ impl AssociatedKeys {
 
     /// Adds new AssociatedKey to the set.
     /// Returns true if added successfully, false otherwise.
-    #[allow(clippy::map_entry)]
     pub fn add_key(&mut self, key: AccountHash, weight: Weight) -> Result<(), AddKeyFailure> {
-        if self.0.len() == MAX_ASSOCIATED_KEYS {
-            Err(AddKeyFailure::MaxKeysLimit)
-        } else if self.0.contains_key(&key) {
-            Err(AddKeyFailure::DuplicateKey)
-        } else {
-            self.0.insert(key, weight);
-            Ok(())
+        match self.0.entry(key) {
+            Entry::Vacant(entry) => {
+                entry.insert(weight);
+            }
+            Entry::Occupied(_) => return Err(AddKeyFailure::DuplicateKey),
         }
+        Ok(())
     }
 
     /// Removes key from the associated keys set.
@@ -45,13 +41,15 @@ impl AssociatedKeys {
 
     /// Adds new AssociatedKey to the set.
     /// Returns true if added successfully, false otherwise.
-    #[allow(clippy::map_entry)]
     pub fn update_key(&mut self, key: AccountHash, weight: Weight) -> Result<(), UpdateKeyFailure> {
-        if !self.0.contains_key(&key) {
-            return Err(UpdateKeyFailure::MissingKey);
+        match self.0.entry(key) {
+            Entry::Vacant(_) => {
+                return Err(UpdateKeyFailure::MissingKey);
+            }
+            Entry::Occupied(mut entry) => {
+                *entry.get_mut() = weight;
+            }
         }
-
-        self.0.insert(key, weight);
         Ok(())
     }
 
@@ -125,9 +123,6 @@ impl ToBytes for AssociatedKeys {
 impl FromBytes for AssociatedKeys {
     fn from_bytes(bytes: &[u8]) -> Result<(Self, &[u8]), Error> {
         let (num_keys, mut stream) = u32::from_bytes(bytes)?;
-        if num_keys as usize > MAX_ASSOCIATED_KEYS {
-            return Err(Error::Formatting);
-        }
 
         let mut associated_keys = BTreeMap::new();
         for _ in 0..num_keys {
@@ -144,38 +139,38 @@ impl FromBytes for AssociatedKeys {
 pub mod gens {
     use proptest::prelude::*;
 
-    use casper_types::{
-        account::MAX_ASSOCIATED_KEYS,
-        gens::{account_hash_arb, weight_arb},
-    };
+    use casper_types::gens::{account_hash_arb, weight_arb};
+
+    use crate::storage::protocol_data::DEFAULT_MAX_ASSOCIATED_KEYS;
 
     use super::AssociatedKeys;
 
     pub fn associated_keys_arb() -> impl Strategy<Value = AssociatedKeys> {
-        proptest::collection::btree_map(account_hash_arb(), weight_arb(), MAX_ASSOCIATED_KEYS - 1)
-            .prop_map(|keys| {
-                let mut associated_keys = AssociatedKeys::default();
-                keys.into_iter().for_each(|(k, v)| {
-                    associated_keys.add_key(k, v).unwrap();
-                });
-                associated_keys
-            })
+        proptest::collection::btree_map(
+            account_hash_arb(),
+            weight_arb(),
+            DEFAULT_MAX_ASSOCIATED_KEYS as usize - 1,
+        )
+        .prop_map(|keys| {
+            let mut associated_keys = AssociatedKeys::default();
+            keys.into_iter().for_each(|(k, v)| {
+                associated_keys.add_key(k, v).unwrap();
+            });
+            associated_keys
+        })
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::{
-        collections::{BTreeMap, BTreeSet},
-        iter::FromIterator,
-    };
+    use std::{collections::BTreeSet, iter::FromIterator};
 
     use casper_types::{
-        account::{AccountHash, AddKeyFailure, Weight, ACCOUNT_HASH_LENGTH, MAX_ASSOCIATED_KEYS},
-        bytesrepr::{self, ToBytes},
+        account::{AccountHash, AddKeyFailure, Weight, ACCOUNT_HASH_LENGTH},
+        bytesrepr,
     };
 
-    use super::AssociatedKeys;
+    use super::*;
 
     #[test]
     fn associated_keys_add() {
@@ -185,29 +180,6 @@ mod tests {
         let new_pk_weight = Weight::new(2);
         assert!(keys.add_key(new_pk, new_pk_weight).is_ok());
         assert_eq!(keys.get(&new_pk), Some(&new_pk_weight))
-    }
-
-    #[test]
-    fn associated_keys_add_full() {
-        let map = (0..MAX_ASSOCIATED_KEYS).map(|k| {
-            (
-                AccountHash::new([k as u8; ACCOUNT_HASH_LENGTH]),
-                Weight::new(k as u8),
-            )
-        });
-        assert_eq!(map.len(), 10);
-        let mut keys = {
-            let mut tmp = AssociatedKeys::default();
-            map.for_each(|(key, weight)| assert!(tmp.add_key(key, weight).is_ok()));
-            tmp
-        };
-        assert_eq!(
-            keys.add_key(
-                AccountHash::new([100u8; ACCOUNT_HASH_LENGTH]),
-                Weight::new(100)
-            ),
-            Err(AddKeyFailure::MaxKeysLimit)
-        )
     }
 
     #[test]
@@ -231,6 +203,23 @@ mod tests {
         assert!(keys
             .remove_key(&AccountHash::new([1u8; ACCOUNT_HASH_LENGTH]))
             .is_err());
+    }
+
+    #[test]
+    fn associated_keys_update() {
+        let pk1 = AccountHash::new([0u8; ACCOUNT_HASH_LENGTH]);
+        let pk2 = AccountHash::new([1u8; ACCOUNT_HASH_LENGTH]);
+        let weight = Weight::new(1);
+        let mut keys = AssociatedKeys::new(pk1, weight);
+        assert!(matches!(
+            keys.update_key(pk2, Weight::new(2))
+                .expect_err("should get error"),
+            UpdateKeyFailure::MissingKey
+        ));
+        keys.add_key(pk2, Weight::new(1)).unwrap();
+        assert_eq!(keys.get(&pk2), Some(&Weight::new(1)));
+        keys.update_key(pk2, Weight::new(2)).unwrap();
+        assert_eq!(keys.get(&pk2), Some(&Weight::new(2)));
     }
 
     #[test]
@@ -344,24 +333,5 @@ mod tests {
         keys.add_key(AccountHash::new([3; 32]), Weight::new(3))
             .unwrap();
         bytesrepr::test_serialization_roundtrip(&keys);
-    }
-
-    #[test]
-    fn should_not_panic_deserializing_malicious_data() {
-        let malicious_map: BTreeMap<AccountHash, Weight> = (1usize..=(MAX_ASSOCIATED_KEYS + 1))
-            .map(|i| {
-                let i_bytes = i.to_be_bytes();
-                let mut account_hash_bytes = [0u8; 32];
-                account_hash_bytes[32 - i_bytes.len()..].copy_from_slice(&i_bytes);
-                (AccountHash::new(account_hash_bytes), Weight::new(i as u8))
-            })
-            .collect();
-
-        let bytes = malicious_map.to_bytes().expect("should serialize");
-
-        assert_eq!(
-            bytesrepr::deserialize::<AssociatedKeys>(bytes).expect_err("should deserialize"),
-            bytesrepr::Error::Formatting
-        );
     }
 }

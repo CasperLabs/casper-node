@@ -140,7 +140,7 @@ where
     ) -> Result<GenesisResult, Error> {
         // Preliminaries
         let initial_root_hash = self.state.empty_root();
-        let system_config = ee_config.system_config();
+        let system_costs = ee_config.system_costs();
 
         let tracking_copy = match self.tracking_copy(initial_root_hash) {
             Ok(Some(tracking_copy)) => Rc::new(RefCell::new(tracking_copy)),
@@ -151,6 +151,7 @@ where
         };
 
         let wasm_config = ee_config.wasm_config();
+        let core_config = ee_config.core_config();
         let preprocessor = Preprocessor::new(*wasm_config);
 
         let system_module = tracking_copy
@@ -186,7 +187,8 @@ where
         {
             let protocol_data = ProtocolData::new(
                 *wasm_config,
-                *system_config,
+                *core_config,
+                *system_costs,
                 mint_hash,
                 handle_payment_hash,
                 standard_payment_hash,
@@ -274,15 +276,21 @@ where
             None => current_protocol_data.wasm_config(),
         };
 
-        let new_system_config = match upgrade_config.system_config() {
-            Some(new_system_config) => new_system_config,
-            None => current_protocol_data.system_config(),
+        let new_core_config = match upgrade_config.core_config() {
+            Some(new_core_config) => new_core_config,
+            None => current_protocol_data.core_config(),
+        };
+
+        let new_system_costs = match upgrade_config.system_costs() {
+            Some(new_system_costs) => new_system_costs,
+            None => current_protocol_data.system_costs(),
         };
 
         // 3.1.2.2 persist wasm CostTable
         let new_protocol_data = ProtocolData::new(
             *new_wasm_config,
-            *new_system_config,
+            *new_core_config,
+            *new_system_costs,
             current_protocol_data.mint(),
             current_protocol_data.handle_payment(),
             current_protocol_data.standard_payment(),
@@ -621,7 +629,7 @@ where
         let gas_limit = Gas::new(U512::from(std::u64::MAX));
 
         let wasmless_transfer_gas_cost = Gas::new(U512::from(
-            protocol_data.system_config().wasmless_transfer_cost(),
+            protocol_data.system_costs().wasmless_transfer_cost(),
         ));
 
         let wasmless_transfer_motes = match Motes::from_gas(

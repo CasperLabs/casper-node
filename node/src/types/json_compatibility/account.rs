@@ -70,6 +70,7 @@ impl From<&ExecutionEngineAccount> for Account {
             main_purse: ee_account.main_purse(),
             associated_keys: ee_account
                 .associated_keys()
+                .iter()
                 .map(|(account_hash, weight)| AssociatedKey {
                     account_hash: *account_hash,
                     weight: weight.value(),

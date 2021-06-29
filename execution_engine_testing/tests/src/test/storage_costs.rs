@@ -10,7 +10,7 @@ use casper_engine_test_support::{
     DEFAULT_ACCOUNT_ADDR,
 };
 #[cfg(not(feature = "use-as-wasm"))]
-use casper_execution_engine::shared::system_config::auction_costs::DEFAULT_ADD_BID_COST;
+use casper_execution_engine::shared::system_costs::auction_costs::DEFAULT_ADD_BID_COST;
 use casper_execution_engine::shared::{
     host_function_costs::{HostFunction, HostFunctionCosts},
     opcode_costs::OpcodeCosts,

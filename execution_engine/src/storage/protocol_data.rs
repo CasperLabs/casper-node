@@ -5,16 +5,18 @@ use casper_types::{
     ContractHash, HashAddr,
 };
 
-use crate::shared::{system_config::SystemConfig, wasm_config::WasmConfig};
+use crate::shared::{core_config::CoreConfig, system_costs::SystemCosts, wasm_config::WasmConfig};
 
 const DEFAULT_ADDRESS: [u8; 32] = [0; 32];
 pub const DEFAULT_WASMLESS_TRANSFER_COST: u32 = 10_000;
+pub const DEFAULT_MAX_ASSOCIATED_KEYS: u32 = 100;
 
 /// Represents a protocol's data. Intended to be associated with a given protocol version.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct ProtocolData {
     wasm_config: WasmConfig,
-    system_config: SystemConfig,
+    core_config: CoreConfig,
+    system_costs: SystemCosts,
     mint: ContractHash,
     handle_payment: ContractHash,
     standard_payment: ContractHash,
@@ -29,7 +31,8 @@ impl Default for ProtocolData {
     fn default() -> ProtocolData {
         ProtocolData {
             wasm_config: WasmConfig::default(),
-            system_config: SystemConfig::default(),
+            core_config: CoreConfig::default(),
+            system_costs: SystemCosts::default(),
             mint: DEFAULT_ADDRESS.into(),
             handle_payment: DEFAULT_ADDRESS.into(),
             standard_payment: DEFAULT_ADDRESS.into(),
@@ -42,7 +45,8 @@ impl ProtocolData {
     /// Creates a new `ProtocolData` value from a given `WasmCosts` value.
     pub fn new(
         wasm_config: WasmConfig,
-        system_costs: SystemConfig,
+        core_config: CoreConfig,
+        system_costs: SystemCosts,
         mint: ContractHash,
         handle_payment: ContractHash,
         standard_payment: ContractHash,
@@ -50,7 +54,8 @@ impl ProtocolData {
     ) -> Self {
         ProtocolData {
             wasm_config,
-            system_config: system_costs,
+            core_config,
+            system_costs,
             mint,
             handle_payment,
             standard_payment,
@@ -90,9 +95,14 @@ impl ProtocolData {
         &self.wasm_config
     }
 
+    /// Gets the `CoreConfig` value from a given [`ProtocolData`] value.
+    pub fn core_config(&self) -> &CoreConfig {
+        &self.core_config
+    }
+
     /// Gets the `SystemConfig` value from a given [`ProtocolData`] value.
-    pub fn system_config(&self) -> &SystemConfig {
-        &self.system_config
+    pub fn system_costs(&self) -> &SystemCosts {
+        &self.system_costs
     }
 
     pub fn mint(&self) -> ContractHash {
@@ -152,7 +162,8 @@ impl ToBytes for ProtocolData {
         let mut ret = bytesrepr::unchecked_allocate_buffer(self);
 
         ret.append(&mut self.wasm_config.to_bytes()?);
-        ret.append(&mut self.system_config.to_bytes()?);
+        ret.append(&mut self.core_config.to_bytes()?);
+        ret.append(&mut self.system_costs.to_bytes()?);
         ret.append(&mut self.mint.to_bytes()?);
         ret.append(&mut self.handle_payment.to_bytes()?);
         ret.append(&mut self.standard_payment.to_bytes()?);
@@ -163,7 +174,8 @@ impl ToBytes for ProtocolData {
 
     fn serialized_length(&self) -> usize {
         self.wasm_config.serialized_length()
-            + self.system_config.serialized_length()
+            + self.core_config.serialized_length()
+            + self.system_costs.serialized_length()
             + self.mint.serialized_length()
             + self.handle_payment.serialized_length()
             + self.standard_payment.serialized_length()
@@ -174,7 +186,8 @@ impl ToBytes for ProtocolData {
 impl FromBytes for ProtocolData {
     fn from_bytes(bytes: &[u8]) -> Result<(Self, &[u8]), bytesrepr::Error> {
         let (wasm_config, rem) = WasmConfig::from_bytes(bytes)?;
-        let (system_config, rem) = FromBytes::from_bytes(rem)?;
+        let (core_config, rem) = CoreConfig::from_bytes(rem)?;
+        let (system_costs, rem) = FromBytes::from_bytes(rem)?;
         let (mint, rem) = HashAddr::from_bytes(rem)?;
         let (handle_payment, rem) = HashAddr::from_bytes(rem)?;
         let (standard_payment, rem) = HashAddr::from_bytes(rem)?;
@@ -183,11 +196,12 @@ impl FromBytes for ProtocolData {
         Ok((
             ProtocolData {
                 wasm_config,
+                core_config,
+                system_costs,
                 mint: mint.into(),
                 handle_payment: handle_payment.into(),
                 standard_payment: standard_payment.into(),
                 auction: auction.into(),
-                system_config,
             },
             rem,
         ))
@@ -199,7 +213,8 @@ pub(crate) mod gens {
     use proptest::prop_compose;
 
     use crate::shared::{
-        system_config::gens::system_config_arb, wasm_config::gens::wasm_config_arb,
+        core_config::gens::core_config_arb, system_costs::gens::system_costs_arb,
+        wasm_config::gens::wasm_config_arb,
     };
     use casper_types::gens;
 
@@ -208,7 +223,8 @@ pub(crate) mod gens {
     prop_compose! {
         pub fn protocol_data_arb()(
             wasm_config in wasm_config_arb(),
-            system_config in system_config_arb(),
+            core_config in core_config_arb(),
+            system_costs in system_costs_arb(),
             mint in gens::u8_slice_32(),
             handle_payment in gens::u8_slice_32(),
             standard_payment in gens::u8_slice_32(),
@@ -216,7 +232,8 @@ pub(crate) mod gens {
         ) -> ProtocolData {
             ProtocolData {
                 wasm_config,
-                system_config,
+                core_config,
+                system_costs,
                 mint: mint.into(),
                 handle_payment: handle_payment.into(),
                 standard_payment: standard_payment.into(),
@@ -230,7 +247,9 @@ pub(crate) mod gens {
 mod tests {
     use proptest::proptest;
 
-    use crate::shared::{system_config::SystemConfig, wasm_config::WasmConfig};
+    use crate::shared::{
+        core_config::CoreConfig, system_costs::SystemCosts, wasm_config::WasmConfig,
+    };
     use casper_types::{bytesrepr, ContractHash};
 
     use super::{gens, ProtocolData};
@@ -243,10 +262,12 @@ mod tests {
         let auction_reference = [4u8; 32].into();
         let protocol_data = {
             let wasm_config = WasmConfig::default();
-            let system_config = SystemConfig::default();
+            let core_config = CoreConfig::default();
+            let system_costs = SystemCosts::default();
             ProtocolData::new(
                 wasm_config,
-                system_config,
+                core_config,
+                system_costs,
                 mint_reference,
                 handle_payment_reference,
                 standard_payment_reference,
@@ -278,10 +299,12 @@ mod tests {
         let auction_reference = [4u8; 32].into();
         let protocol_data = {
             let wasm_config = WasmConfig::default();
-            let system_config = SystemConfig::default();
+            let core_config = CoreConfig::default();
+            let system_costs = SystemCosts::default();
             ProtocolData::new(
                 wasm_config,
-                system_config,
+                core_config,
+                system_costs,
                 mint_reference,
                 handle_payment_reference,
                 standard_payment_reference,

@@ -1358,8 +1358,8 @@ where
             mint_context,
         );
 
-        let system_config = protocol_data.system_config();
-        let mint_costs = system_config.mint_costs();
+        let system_costs = protocol_data.system_costs();
+        let mint_costs = system_costs.mint_costs();
 
         let result = match entry_point_name {
             // Type: `fn mint(amount: U512) -> Result<URef, Error>`
@@ -1503,8 +1503,8 @@ where
             runtime_context,
         );
 
-        let system_config = protocol_data.system_config();
-        let handle_payment_costs = system_config.handle_payment_costs();
+        let system_costs = protocol_data.system_costs();
+        let handle_payment_costs = system_costs.handle_payment_costs();
 
         let result = match entry_point_name {
             handle_payment::METHOD_GET_PAYMENT_PURSE => (|| {
@@ -1630,8 +1630,8 @@ where
             runtime_context,
         );
 
-        let system_config = protocol_data.system_config();
-        let auction_costs = system_config.auction_costs();
+        let system_costs = protocol_data.system_costs();
+        let auction_costs = system_costs.auction_costs();
 
         let result = match entry_point_name {
             auction::METHOD_GET_ERA_VALIDATORS => (|| {

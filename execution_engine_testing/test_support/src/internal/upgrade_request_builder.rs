@@ -5,8 +5,8 @@ use num_rational::Ratio;
 use casper_execution_engine::{
     core::engine_state::UpgradeConfig,
     shared::{
-        newtypes::Blake2bHash, stored_value::StoredValue, system_config::SystemConfig,
-        wasm_config::WasmConfig,
+        core_config::CoreConfig, newtypes::Blake2bHash, stored_value::StoredValue,
+        system_costs::SystemCosts, wasm_config::WasmConfig,
     },
 };
 use casper_types::{EraId, Key, ProtocolVersion};
@@ -17,7 +17,8 @@ pub struct UpgradeRequestBuilder {
     current_protocol_version: ProtocolVersion,
     new_protocol_version: ProtocolVersion,
     new_wasm_config: Option<WasmConfig>,
-    new_system_config: Option<SystemConfig>,
+    new_core_config: Option<CoreConfig>,
+    new_system_costs: Option<SystemCosts>,
     activation_point: Option<EraId>,
     new_validator_slots: Option<u32>,
     new_auction_delay: Option<u64>,
@@ -56,6 +57,12 @@ impl UpgradeRequestBuilder {
         self.new_wasm_config = Some(opcode_costs);
         self
     }
+
+    pub fn with_new_core_config(mut self, core_config: CoreConfig) -> Self {
+        self.new_core_config = Some(core_config);
+        self
+    }
+
     pub fn with_new_auction_delay(mut self, new_auction_delay: u64) -> Self {
         self.new_auction_delay = Some(new_auction_delay);
         self
@@ -79,8 +86,8 @@ impl UpgradeRequestBuilder {
         self
     }
 
-    pub fn with_new_system_config(mut self, new_system_config: SystemConfig) -> Self {
-        self.new_system_config = Some(new_system_config);
+    pub fn with_new_system_costs(mut self, new_system_costs: SystemCosts) -> Self {
+        self.new_system_costs = Some(new_system_costs);
         self
     }
 
@@ -103,7 +110,8 @@ impl UpgradeRequestBuilder {
             self.current_protocol_version,
             self.new_protocol_version,
             self.new_wasm_config,
-            self.new_system_config,
+            self.new_core_config,
+            self.new_system_costs,
             self.activation_point,
             self.new_validator_slots,
             self.new_auction_delay,
