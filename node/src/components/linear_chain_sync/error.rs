@@ -11,7 +11,8 @@ use crate::{
     components::fetcher::FetcherError,
     crypto,
     types::{
-        BlockHash, BlockHeader, BlockHeaderWithMetadata, BlockSignatures, BlockWithMetadata, Deploy,
+        Block, BlockHash, BlockHeader, BlockHeaderWithMetadata, BlockSignatures, BlockWithMetadata,
+        Deploy,
     },
 };
 use num::rational::Ratio;
@@ -89,6 +90,9 @@ where
         current_version: ProtocolVersion,
         block_header_with_future_version: Box<BlockHeader>,
     },
+
+    #[error(transparent)]
+    BlockFetcherError(#[from] FetcherError<Block, I>),
 
     #[error(transparent)]
     BlockHeaderFetcherError(#[from] FetcherError<BlockHeader, I>),
