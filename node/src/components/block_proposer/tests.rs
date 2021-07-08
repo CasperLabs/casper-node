@@ -51,6 +51,7 @@ fn generate_transfer(
         payment,
         session,
         &secret_key,
+        None,
     )
 }
 
@@ -85,6 +86,7 @@ fn generate_deploy(
         payment,
         session,
         &secret_key,
+        None,
     )
 }
 

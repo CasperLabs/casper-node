@@ -195,36 +195,42 @@ pub mod block_identifier {
     }
 }
 
-/// Handles providing the arg for and retrieval of the public key.
-pub mod public_key {
+/// Internal module to handle providing the arg for and retrieval of the public key or session
+/// account.
+mod sealed_public_key {
     use casper_node::crypto::AsymmetricKeyExt;
     use casper_types::AsymmetricType;
 
     use super::*;
 
-    const ARG_NAME: &str = "public-key";
-    const ARG_SHORT: &str = "p";
     const ARG_VALUE_NAME: &str = "FORMATTED STRING or PATH";
-    const ARG_HELP: &str =
-        "This must be a properly formatted public key. The public key may instead be read in from \
-        a file, in which case enter the path to the file as the --public-key argument. The file \
-        should be one of the two public key files generated via the `keygen` subcommand; \
-        \"public_key_hex\" or \"public_key.pem\"";
 
-    pub(crate) fn arg(order: usize) -> Arg<'static, 'static> {
-        Arg::with_name(ARG_NAME)
-            .long(ARG_NAME)
-            .short(ARG_SHORT)
-            .required(true)
+    pub(crate) fn arg(
+        order: usize,
+        arg_name: &'static str,
+        arg_help: &'static str,
+        required: bool,
+    ) -> Arg<'static, 'static> {
+        Arg::with_name(arg_name)
+            .long(arg_name)
+            .required(required)
             .value_name(ARG_VALUE_NAME)
-            .help(ARG_HELP)
+            .help(arg_help)
             .display_order(order)
     }
 
-    pub(crate) fn get(matches: &ArgMatches) -> Result<String, Error> {
-        let value = matches
-            .value_of(ARG_NAME)
-            .unwrap_or_else(|| panic!("should have {} arg", ARG_NAME));
+    pub(crate) fn get(
+        matches: &ArgMatches,
+        arg_name: &str,
+        required: bool,
+    ) -> Result<String, Error> {
+        let value = matches.value_of(arg_name).unwrap_or_else(|| {
+            if required {
+                panic!("should have {} arg", arg_name)
+            } else {
+                ""
+            }
+        });
 
         // Try to read as a PublicKey PEM file first.
         if let Ok(public_key) = PublicKey::from_file(value) {
@@ -244,5 +250,49 @@ pub mod public_key {
         }
 
         Ok(value.to_string())
+    }
+}
+
+/// Handles providing the arg for and retrieval of the public key.
+pub mod public_key {
+    use super::*;
+
+    const ARG_NAME: &str = "public-key";
+    const IS_REQUIRED: bool = true;
+    const ARG_HELP: &str =
+        "This must be a properly formatted public key. The public key may instead be read in from \
+        a file, in which case enter the path to the file as the --public-key argument. The file \
+        should be one of the two public key files generated via the `keygen` subcommand; \
+        \"public_key_hex\" or \"public_key.pem\"";
+
+    pub(crate) fn arg(order: usize) -> Arg<'static, 'static> {
+        sealed_public_key::arg(order, ARG_NAME, ARG_HELP, IS_REQUIRED)
+    }
+
+    pub(crate) fn get(matches: &ArgMatches) -> Result<String, Error> {
+        sealed_public_key::get(matches, ARG_NAME, IS_REQUIRED)
+    }
+}
+
+/// Handles providing the arg for and retrieval of the session account arg when specifying an
+/// account for a Deploy.
+pub(super) mod session_account {
+    use super::*;
+
+    pub const ARG_NAME: &str = "session-account";
+    const IS_REQUIRED: bool = false;
+    const ARG_HELP: &str =
+        "The hex-encoded public key of the account context under which the session code will be
+        executed. This must be a properly formatted public key. The public key may instead be read in from \
+        a file, in which case enter the path to the file as the --session-account argument. The file \
+        should be one of the two public key files generated via the `keygen` subcommand; \
+        \"public_key_hex\" or \"public_key.pem\"";
+
+    pub fn arg(display_order: usize) -> Arg<'static, 'static> {
+        sealed_public_key::arg(display_order, ARG_NAME, ARG_HELP, IS_REQUIRED)
+    }
+
+    pub fn get(matches: &ArgMatches) -> Result<String, Error> {
+        sealed_public_key::get(matches, ARG_NAME, IS_REQUIRED)
     }
 }

@@ -123,7 +123,7 @@ lint:
 
 .PHONY: audit
 audit:
-	$(CARGO) audit
+	$(CARGO) audit --ignore RUSTSEC-2021-0072
 
 .PHONY: build-docs-stable-rs
 build-docs-stable-rs: $(CRATES_WITH_DOCS_RS_MANIFEST_TABLE)

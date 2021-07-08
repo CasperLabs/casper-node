@@ -117,6 +117,7 @@ fn new_deploy(rng: &mut TestRng, timestamp: Timestamp, ttl: TimeDiff) -> Deploy 
         payment,
         session,
         &secret_key,
+        None,
     )
 }
 
@@ -142,6 +143,7 @@ fn new_transfer(rng: &mut TestRng, timestamp: Timestamp, ttl: TimeDiff) -> Deplo
         payment,
         session,
         &secret_key,
+        None,
     )
 }
 

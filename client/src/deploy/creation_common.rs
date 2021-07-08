@@ -36,6 +36,7 @@ pub(super) enum DisplayOrder {
     SessionEntryPoint,
     SessionVersion,
     SessionTransfer,
+    SessionAccount,
     StandardPayment,
     PaymentCode,
     PaymentArgSimple,
@@ -536,7 +537,10 @@ pub(super) fn apply_common_creation_options<'a, 'b>(
         .arg(ttl::arg())
         .arg(gas_price::arg())
         .arg(dependencies::arg())
-        .arg(chain_name::arg());
+        .arg(chain_name::arg())
+        .arg(common::session_account::arg(
+            DisplayOrder::SessionAccount as usize,
+        ));
     subcommand
 }
 
