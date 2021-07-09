@@ -14,8 +14,9 @@ use crate::{
 };
 
 /// Errors which can occur while executing the Auction contract.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(feature = "std", derive(Error))]
+#[cfg_attr(test, derive(strum::EnumIter))]
 #[repr(u8)]
 pub enum Error {
     /// Unable to find named key in the contract's named keys.
@@ -155,16 +156,7 @@ pub enum Error {
     #[doc(hidden)]
     #[cfg_attr(feature = "std", error("GasLimit"))]
     GasLimit,
-
-    #[cfg(test)]
-    #[doc(hidden)]
-    #[cfg_attr(feature = "std", error("Sentinel error"))]
-    Sentinel,
 }
-
-/// Used for testing; this should be guaranteed to be the maximum valid value of [`Error`] enum.
-#[cfg(test)]
-const MAX_ERROR_VALUE: u8 = Error::Sentinel as u8;
 
 impl CLTyped for Error {
     fn cl_type() -> CLType {
@@ -174,6 +166,7 @@ impl CLTyped for Error {
 
 // This error type is not intended to be used by third party crates.
 #[doc(hidden)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct TryFromU8ForError(());
 
 // This conversion is not intended to be used by third party crates.
@@ -284,22 +277,29 @@ impl From<PurseLookupError> for Error {
 mod tests {
     use std::convert::TryFrom;
 
-    use super::{Error, TryFromU8ForError, MAX_ERROR_VALUE};
+    use strum::IntoEnumIterator;
+
+    use super::Error;
 
     #[test]
-    fn error_round_trips() {
-        for i in 0..=u8::max_value() {
-            match Error::try_from(i) {
-                Ok(error) if i < MAX_ERROR_VALUE => assert_eq!(error as u8, i),
-                Ok(error) => panic!(
-                    "value of variant {:?} ({}) exceeds MAX_ERROR_VALUE ({})",
-                    error, i, MAX_ERROR_VALUE
-                ),
-                Err(TryFromU8ForError(())) if i >= MAX_ERROR_VALUE => (),
-                Err(TryFromU8ForError(())) => {
-                    panic!("missing conversion from u8 to error value: {}", i)
+    fn error_forward_trips() {
+        for expected_error_variant in Error::iter() {
+            assert_eq!(
+                Error::try_from(expected_error_variant as u8),
+                Ok(expected_error_variant)
+            )
+        }
+    }
+
+    #[test]
+    fn error_backward_trips() {
+        for u8 in 0..=u8::max_value() {
+            match Error::try_from(u8) {
+                Ok(error_variant) => {
+                    assert_eq!(u8, error_variant as u8, "Error code mismatch")
                 }
-            }
+                Err(_) => continue,
+            };
         }
     }
 }

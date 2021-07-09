@@ -41,6 +41,7 @@ getrandom = { version = "0.2.0", features = ["rdrand"] }
 proptest = "1.0.0"
 serde_json = "1.0.55"
 serde_test = "1.0.117"
+strum = { version = "0.21", features = ["derive"] }
 version-sync = "0.9"
 
 [features]
