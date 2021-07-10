@@ -1,18 +1,17 @@
-[![LOGO](images/CasperLabs_Logo_Horizontal_RGB.png)](https://casperlabs.io/)
+[![LOGO](images/casper-logo-primary.png)](https://casper.network)
 
-Casper is the blockchain platform purpose-built to scale opportunity for everyone. Building toward blockchain’s next frontier, Casper is designed for real-world applications without sacrificing usability, cost, decentralization, or security. It removes the barriers that prevent mainstream blockchain adoption by making blockchain friendly to use, open to the world, and future-proof to support innovations today and tomorrow. Guided by open-source principles and built from the ground up to empower individuals, the team seeks to provide an equitable foundation made for long-lasting impact. Read more about our mission at: https://casperlabs.io/company
+Casper is the blockchain platform purpose-built to scale opportunity for everyone. Building toward blockchain’s next frontier, Casper is designed for real-world applications without sacrificing usability, cost, decentralization, or security. It removes the barriers that prevent mainstream blockchain adoption by making blockchain friendly to use, open to the world, and future-proof to support innovations today and tomorrow. Guided by open-source principles and built from the ground up to empower individuals, the team seeks to provide an equitable foundation made for long-lasting impact. Read more at: https://casper.network
 
 ## Current Development Status
-The status on development is reported during the Community calls and is found [here](https://github.com/CasperLabs/Governance/wiki/Current-Status)
+The status on development is reported during the Community calls and is found [here](https://github.com/casper-network/Governance/wiki/Current-Status)
 
-The Casper Testnet is live.
-- Transactions can be sent to: deploy.casperlabs.io via the client or via Clarity.
+The Casper Mainnet is live.
 - [Clarity Block Exporer](https://clarity.casperlabs.io)
 
 ## Specification
 
 - [Platform Specification](https://docs.casperlabs.io/en/latest/implementation/index.html)
-- [Highway Consensus Proofs](https://github.com/CasperLabs/highway/releases/latest)
+- [Highway Consensus Proofs](https://github.com/casper-network/highway/releases/latest)
 
 ## Get Started with Smart Contracts
 - [Writing Smart Contracts](https://docs.casperlabs.io/en/latest/dapp-dev-guide/index.html)
@@ -24,15 +23,13 @@ The Casper Testnet is live.
 
 - [Discord Server](https://discord.gg/mpZ9AYD)
 - [CasperLabs Community Forum](https://forums.casperlabs.io/)
-- [Telegram Channel](https://t.me/CasperLabs)
+- [Telegram Channel](https://t.me/casperblockchain)
 
 # casper-node
 
 This is the core application for the Casper blockchain.
 
-## Running a validator node from Source
-
-### Pre-Requisites for Building
+## Pre-Requisites for Building
 
 * CMake 3.1.4 or greater
 * [Rust](https://www.rust-lang.org/tools/install)
@@ -41,6 +38,12 @@ This is the core application for the Casper blockchain.
 * gcc
 * g++
 * optionally [wasm-strip](https://github.com/WebAssembly/wabt) (used to reduce the size of compiled Wasm)
+
+## Connecting to Mainnet
+
+The community has come up with a guide for connecting to mainnet from scratch:
+
+https://github.com/make-software/how-to-casperlabs/blob/master/docs/ubuntu/setup-validator-from-scratch.md
 
 ### Setup
 
@@ -59,7 +62,6 @@ cargo build -p casper-node --release
 The result will be a `casper-node` binary found in `target/release`.  Copy this somewhere into your
 PATH, or substitute `target/release/casper-node` for `casper-node` in all examples below.
 
-### Running one node
 
 To run a validator node you will need to specify a config file and launch the validator subcommand, for example
 
@@ -80,7 +82,7 @@ __The node will not run properly without another node to connect to.  It is reco
 
 ### Running multiple nodes on one machine
 
-There is a [tool](https://github.com/CasperLabs/casper-node/tree/master/utils/nctl) which automates the process of running multiple nodes on a single machine.
+There is a [tool](https://github.com/casper-network/casper-node/tree/master/utils/nctl) which automates the process of running multiple nodes on a single machine.
 
 Note that running multiple nodes on a single machine is normally only recommended for test purposes.
 
