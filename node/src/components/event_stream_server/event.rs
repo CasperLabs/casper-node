@@ -22,7 +22,7 @@ pub enum Event {
     FinalitySignature(Box<FinalitySignature>),
     Step {
         era_id: EraId,
-        effect: ExecutionEffect,
+        execution_effect: ExecutionEffect,
     },
 }
 

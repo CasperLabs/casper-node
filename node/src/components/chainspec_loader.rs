@@ -29,8 +29,8 @@ use tracing::{debug, error, info, trace, warn};
 use casper_execution_engine::{
     core::engine_state::{
         self,
-        genesis::GenesisResult,
-        upgrade::{UpgradeConfig, UpgradeResult},
+        genesis::GenesisSuccess,
+        upgrade::{UpgradeConfig, UpgradeSuccess},
     },
     shared::stored_value::StoredValue,
 };
@@ -39,7 +39,7 @@ use casper_types::{bytesrepr::FromBytes, EraId, ProtocolVersion};
 #[cfg(test)]
 use crate::utils::RESOURCES_PATH;
 use crate::{
-    components::Component,
+    components::{contract_runtime::ExecutionPreState, Component},
     crypto::hash::Digest,
     effect::{
         announcements::ChainspecLoaderAnnouncement,
@@ -67,9 +67,9 @@ pub enum Event {
         maybe_highest_block: Option<Box<Block>>,
     },
     /// The result of contract runtime running the genesis process.
-    CommitGenesisResult(#[serde(skip_serializing)] Result<GenesisResult, engine_state::Error>),
+    CommitGenesisResult(#[serde(skip_serializing)] Result<GenesisSuccess, engine_state::Error>),
     /// The result of contract runtime running the upgrade process.
-    UpgradeResult(#[serde(skip_serializing)] Result<UpgradeResult, engine_state::Error>),
+    UpgradeResult(#[serde(skip_serializing)] Result<UpgradeSuccess, engine_state::Error>),
     #[from]
     Request(ChainspecLoaderRequest),
     /// Check config dir to see if an upgrade activation point is available, and if so announce it.
@@ -304,8 +304,38 @@ impl ChainspecLoader {
     /// The state root hash with which this session is starting.  It will be the result of running
     /// `ContractRuntime::commit_genesis()` or `ContractRuntime::upgrade()` or else the state root
     /// hash specified in the highest block.
-    pub(crate) fn initial_state_root_hash(&self) -> Digest {
+    pub fn initial_state_root_hash(&self) -> Digest {
         self.initial_state_root_hash
+    }
+
+    /// The state the first block executed after startup will use. It contains:
+    ///   1. The state root to use when executing the next batch of deploys. See
+    /// [`Self::initial_state_root_hash`].
+    ///   2. The height of the next block to be added to the chain.
+    ///     - At genesis the height is 0.
+    ///     - Otherwise it is the successor of the last upgrade block.
+    ///   3. The parent hash for the first block to use when executing.
+    ///     - At genesis this is `[0u8; 32]`
+    ///     - Otherwise it is the block hash of the highest block.
+    ///   4. The _accumulated seed_ to be used in pseudo-random number generation and entropy will
+    /// be added.
+    ///     - At genesis this is `[0u8; 32]`
+    ///     - Otherwise it is the accumulated seed of the highest block.
+    pub(crate) fn initial_execution_pre_state(&self) -> ExecutionPreState {
+        match self.initial_block() {
+            None => ExecutionPreState::new(
+                self.initial_state_root_hash(),
+                0,
+                BlockHash::new(Digest::from([0u8; Digest::LENGTH])),
+                Digest::from([0u8; Digest::LENGTH]),
+            ),
+            Some(block) => ExecutionPreState::new(
+                self.initial_state_root_hash(),
+                block.height() + 1,
+                *block.hash(),
+                block.header().accumulated_seed(),
+            ),
+        }
     }
 
     pub(crate) fn chainspec(&self) -> &Arc<Chainspec> {
@@ -518,66 +548,43 @@ impl ChainspecLoader {
 
     fn handle_commit_genesis_result(
         &mut self,
-        result: Result<GenesisResult, engine_state::Error>,
-    ) -> Effects<Event> {
+        result: Result<GenesisSuccess, engine_state::Error>,
+    ) {
         match result {
-            Ok(genesis_result) => match genesis_result {
-                GenesisResult::RootNotFound
-                | GenesisResult::KeyNotFound(_)
-                | GenesisResult::TypeMismatch(_)
-                | GenesisResult::Serialization(_) => {
-                    error!("failed to commit genesis: {}", genesis_result);
-                    self.reactor_exit = Some(ReactorExit::ProcessShouldExit(ExitCode::Abort));
-                }
-                GenesisResult::Success {
-                    post_state_hash,
-                    effect,
-                } => {
-                    info!("chainspec name {}", self.chainspec.network_config.name);
-                    info!("genesis state root hash {}", post_state_hash);
-                    trace!(%post_state_hash, ?effect);
-                    self.reactor_exit = Some(ReactorExit::ProcessShouldContinue);
-                    self.initial_state_root_hash = post_state_hash.into();
-                }
-            },
+            Ok(GenesisSuccess {
+                post_state_hash,
+                execution_effect,
+            }) => {
+                info!("chainspec name {}", self.chainspec.network_config.name);
+                info!("genesis state root hash {}", post_state_hash);
+                trace!(%post_state_hash, ?execution_effect);
+                self.reactor_exit = Some(ReactorExit::ProcessShouldContinue);
+                self.initial_state_root_hash = post_state_hash.into();
+            }
             Err(error) => {
                 error!("failed to commit genesis: {}", error);
                 self.reactor_exit = Some(ReactorExit::ProcessShouldExit(ExitCode::Abort));
             }
         }
-        Effects::new()
     }
 
-    fn handle_upgrade_result(
-        &mut self,
-        result: Result<UpgradeResult, engine_state::Error>,
-    ) -> Effects<Event> {
+    fn handle_upgrade_result(&mut self, result: Result<UpgradeSuccess, engine_state::Error>) {
         match result {
-            Ok(upgrade_result) => match upgrade_result {
-                UpgradeResult::RootNotFound
-                | UpgradeResult::KeyNotFound(_)
-                | UpgradeResult::TypeMismatch(_)
-                | UpgradeResult::Serialization(_) => {
-                    error!("failed to upgrade contract runtime: {}", upgrade_result);
-                    self.reactor_exit = Some(ReactorExit::ProcessShouldExit(ExitCode::Abort));
-                }
-                UpgradeResult::Success {
-                    post_state_hash,
-                    effect,
-                } => {
-                    info!("chainspec name {}", self.chainspec.network_config.name);
-                    info!("state root hash {}", post_state_hash);
-                    trace!(%post_state_hash, ?effect);
-                    self.reactor_exit = Some(ReactorExit::ProcessShouldContinue);
-                    self.initial_state_root_hash = post_state_hash.into();
-                }
-            },
+            Ok(UpgradeSuccess {
+                post_state_hash,
+                execution_effect,
+            }) => {
+                info!("chainspec name {}", self.chainspec.network_config.name);
+                info!("state root hash {}", post_state_hash);
+                trace!(%post_state_hash, ?execution_effect);
+                self.reactor_exit = Some(ReactorExit::ProcessShouldContinue);
+                self.initial_state_root_hash = post_state_hash.into();
+            }
             Err(error) => {
                 error!("failed to upgrade contract runtime: {}", error);
                 self.reactor_exit = Some(ReactorExit::ProcessShouldExit(ExitCode::Abort));
             }
         }
-        Effects::new()
     }
 
     fn new_chainspec_info(&self) -> ChainspecInfo {
@@ -667,8 +674,14 @@ where
             Event::Initialize {
                 maybe_highest_block: highest_block,
             } => self.handle_initialize(effect_builder, highest_block),
-            Event::CommitGenesisResult(result) => self.handle_commit_genesis_result(result),
-            Event::UpgradeResult(result) => self.handle_upgrade_result(result),
+            Event::CommitGenesisResult(result) => {
+                self.handle_commit_genesis_result(result);
+                Effects::new()
+            }
+            Event::UpgradeResult(result) => {
+                self.handle_upgrade_result(result);
+                Effects::new()
+            }
             Event::Request(ChainspecLoaderRequest::GetChainspecInfo(responder)) => {
                 responder.respond(self.new_chainspec_info()).ignore()
             }

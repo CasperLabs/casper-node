@@ -19,59 +19,23 @@ use crate::{
         stored_value::StoredValue,
         system_config::SystemConfig,
         wasm_config::WasmConfig,
-        TypeMismatch,
     },
-    storage::{
-        global_state::{CommitResult, StateProvider},
-        protocol_data::ProtocolData,
-    },
+    storage::{global_state::StateProvider, protocol_data::ProtocolData},
 };
 
 #[derive(Debug, Clone)]
-pub enum UpgradeResult {
-    RootNotFound,
-    KeyNotFound(Key),
-    TypeMismatch(TypeMismatch),
-    Serialization(bytesrepr::Error),
-    Success {
-        post_state_hash: Blake2bHash,
-        effect: ExecutionEffect,
-    },
+pub struct UpgradeSuccess {
+    pub post_state_hash: Blake2bHash,
+    pub execution_effect: ExecutionEffect,
 }
 
-impl fmt::Display for UpgradeResult {
+impl fmt::Display for UpgradeSuccess {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        match self {
-            UpgradeResult::RootNotFound => write!(f, "Root not found"),
-            UpgradeResult::KeyNotFound(key) => write!(f, "Key not found: {}", key),
-            UpgradeResult::TypeMismatch(type_mismatch) => {
-                write!(f, "Type mismatch: {:?}", type_mismatch)
-            }
-            UpgradeResult::Serialization(error) => write!(f, "Serialization error: {:?}", error),
-            UpgradeResult::Success {
-                post_state_hash,
-                effect,
-            } => write!(f, "Success: {} {:?}", post_state_hash, effect),
-        }
-    }
-}
-
-impl UpgradeResult {
-    pub fn from_commit_result(commit_result: CommitResult, effect: ExecutionEffect) -> Self {
-        match commit_result {
-            CommitResult::RootNotFound => UpgradeResult::RootNotFound,
-            CommitResult::KeyNotFound(key) => UpgradeResult::KeyNotFound(key),
-            CommitResult::TypeMismatch(type_mismatch) => UpgradeResult::TypeMismatch(type_mismatch),
-            CommitResult::Serialization(error) => UpgradeResult::Serialization(error),
-            CommitResult::Success { state_root, .. } => UpgradeResult::Success {
-                post_state_hash: state_root,
-                effect,
-            },
-        }
-    }
-
-    pub fn is_success(&self) -> bool {
-        matches!(&self, UpgradeResult::Success { .. })
+        write!(
+            f,
+            "Success: {} {:?}",
+            self.post_state_hash, self.execution_effect
+        )
     }
 }
 

@@ -86,9 +86,8 @@ use casper_execution_engine::{
         self,
         era_validators::GetEraValidatorsError,
         execution_effect::ExecutionEffect,
-        genesis::GenesisResult,
-        step::{StepRequest, StepResult},
-        upgrade::{UpgradeConfig, UpgradeResult},
+        genesis::GenesisSuccess,
+        upgrade::{UpgradeConfig, UpgradeSuccess},
         BalanceRequest, BalanceResult, GetBidsRequest, GetBidsResult, QueryRequest, QueryResult,
         MAX_PAYMENT,
     },
@@ -111,7 +110,6 @@ use crate::{
         small_network::GossipedAddress,
     },
     crypto::hash::Digest,
-    effect::requests::LinearChainRequest,
     reactor::{EventQueueHandle, QueueKind},
     types::{
         Block, BlockByHeight, BlockHash, BlockHeader, BlockPayload, BlockSignatures, Chainspec,
@@ -132,6 +130,9 @@ use requests::{
 };
 
 use self::announcements::BlocklistAnnouncement;
+use crate::components::contract_runtime::{
+    BlockAndExecutionEffects, BlockExecutionError, ExecutionPreState,
+};
 
 /// A resource that will never be available, thus trying to acquire it will wait forever.
 static UNOBTAINABLE: Lazy<Semaphore> = Lazy::new(|| Semaphore::new(0));
@@ -495,18 +496,6 @@ impl<REv> EffectBuilder<REv> {
         .await
     }
 
-    /// Retrieves block at `height` from the Linear Chain component.
-    pub(crate) async fn get_block_at_height_local<I>(self, height: u64) -> Option<Block>
-    where
-        REv: From<LinearChainRequest<I>>,
-    {
-        self.make_request(
-            |responder| LinearChainRequest::BlockAtHeightLocal(height, responder),
-            QueueKind::Regular,
-        )
-        .await
-    }
-
     /// Sends a network message.
     ///
     /// The message is queued in "fire-and-forget" fashion, there is no guarantee that the peer
@@ -713,19 +702,6 @@ impl<REv> EffectBuilder<REv> {
         self.0
             .schedule(
                 ContractRuntimeAnnouncement::linear_chain_block(block, execution_results),
-                QueueKind::Regular,
-            )
-            .await
-    }
-
-    /// Announce that a block had been executed before.
-    pub(crate) async fn announce_block_already_executed(self, block: Block)
-    where
-        REv: From<ContractRuntimeAnnouncement>,
-    {
-        self.0
-            .schedule(
-                ContractRuntimeAnnouncement::block_already_executed(block),
                 QueueKind::Regular,
             )
             .await
@@ -1195,14 +1171,50 @@ impl<REv> EffectBuilder<REv> {
         .await
     }
 
-    /// Passes a finalized proto-block to the block executor component to execute it.
-    pub(crate) async fn execute_block(self, finalized_block: FinalizedBlock)
+    /// Executes a finalized block.
+    pub(crate) async fn execute_finalized_block(
+        self,
+        protocol_version: ProtocolVersion,
+        execution_pre_state: ExecutionPreState,
+        finalized_block: FinalizedBlock,
+        deploys: Vec<Deploy>,
+    ) -> Result<BlockAndExecutionEffects, BlockExecutionError>
     where
+        REv: From<ContractRuntimeRequest>,
+    {
+        self.make_request(
+            |responder| ContractRuntimeRequest::ExecuteBlock {
+                protocol_version,
+                execution_pre_state,
+                finalized_block,
+                deploys,
+                responder,
+            },
+            QueueKind::Regular,
+        )
+        .await
+    }
+
+    /// Enqueues a finalized proto-block execution.
+    ///
+    /// # Arguments
+    ///
+    /// * `finalized_block` - a finalized proto-block to add to the execution queue.
+    /// * `deploys` - a vector of deploys and transactions that match the hashes in the finalized
+    ///   block, in that order.
+    pub(crate) async fn enqueue_block_for_execution(
+        self,
+        finalized_block: FinalizedBlock,
+        deploys: Vec<Deploy>,
+    ) where
         REv: From<ContractRuntimeRequest>,
     {
         self.0
             .schedule(
-                ContractRuntimeRequest::ExecuteBlock(finalized_block),
+                ContractRuntimeRequest::EnqueueBlockForExecution {
+                    finalized_block,
+                    deploys,
+                },
                 QueueKind::Regular,
             )
             .await
@@ -1318,7 +1330,7 @@ impl<REv> EffectBuilder<REv> {
     pub(crate) async fn commit_genesis(
         self,
         chainspec: Arc<Chainspec>,
-    ) -> Result<GenesisResult, engine_state::Error>
+    ) -> Result<GenesisSuccess, engine_state::Error>
     where
         REv: From<ContractRuntimeRequest>,
     {
@@ -1336,7 +1348,7 @@ impl<REv> EffectBuilder<REv> {
     pub(crate) async fn upgrade_contract_runtime(
         self,
         upgrade_config: Box<UpgradeConfig>,
-    ) -> Result<UpgradeResult, engine_state::Error>
+    ) -> Result<UpgradeSuccess, engine_state::Error>
     where
         REv: From<ContractRuntimeRequest>,
     {
@@ -1567,24 +1579,6 @@ impl<REv> EffectBuilder<REv> {
         .await
     }
 
-    /// Runs the end of era step using the system smart contract.
-    pub(crate) async fn run_step(
-        self,
-        step_request: StepRequest,
-    ) -> Result<StepResult, engine_state::Error>
-    where
-        REv: From<ContractRuntimeRequest>,
-    {
-        self.make_request(
-            |responder| ContractRuntimeRequest::Step {
-                step_request,
-                responder,
-            },
-            QueueKind::Regular,
-        )
-        .await
-    }
-
     /// Gets the correct era validators set for the given era.
     /// Takes emergency restarts into account based on the information from the chainspec loader.
     pub(crate) async fn get_era_validators(self, era_id: EraId) -> Option<BTreeMap<PublicKey, U512>>
@@ -1756,6 +1750,6 @@ impl<REv> EffectBuilder<REv> {
 #[macro_export]
 macro_rules! fatal {
     ($effect_builder:expr, $($arg:tt)*) => {
-        $effect_builder.fatal(file!(), line!(), format_args!($($arg)*).to_string())
+        $effect_builder.fatal(file!(), line!(), format!($($arg)*))
     };
 }

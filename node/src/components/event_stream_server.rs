@@ -204,9 +204,12 @@ where
                 timestamp,
             }),
             Event::FinalitySignature(fs) => self.broadcast(SseData::FinalitySignature(fs)),
-            Event::Step { era_id, effect } => self.broadcast(SseData::Step {
+            Event::Step {
                 era_id,
-                execution_effect: effect,
+                execution_effect,
+            } => self.broadcast(SseData::Step {
+                era_id,
+                execution_effect,
             }),
         }
     }

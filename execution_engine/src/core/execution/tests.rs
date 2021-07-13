@@ -18,7 +18,7 @@ fn on_fail_charge_test_helper<T>(
     let transfers = Vec::default();
     let _result = on_fail_charge!(f(), error_cost, transfers);
     ExecutionResult::Success {
-        effect: Default::default(),
+        execution_effect: Default::default(),
         transfers,
         cost: success_cost,
     }
@@ -64,18 +64,22 @@ fn on_fail_charge_with_action() {
             transfers
         );
         ExecutionResult::Success {
-            effect: Default::default(),
+            execution_effect: Default::default(),
             transfers: Vec::default(),
             cost: Gas::default(),
         }
     };
     match f() {
         ExecutionResult::Success { .. } => panic!("Should fail"),
-        ExecutionResult::Failure { cost, effect, .. } => {
+        ExecutionResult::Failure {
+            cost,
+            execution_effect,
+            ..
+        } => {
             assert_eq!(cost, Gas::new(U512::from(456)));
             // Check if the containers are non-empty
-            assert_eq!(effect.ops.len(), 1);
-            assert_eq!(effect.transforms.len(), 1);
+            assert_eq!(execution_effect.ops.len(), 1);
+            assert_eq!(execution_effect.transforms.len(), 1);
         }
     }
 }

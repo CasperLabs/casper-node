@@ -25,7 +25,6 @@ use crate::{
         in_memory_network::{self, InMemoryNetwork, NetworkController},
         storage::{self, Storage},
     },
-    crypto::hash::Digest,
     effect::{
         announcements::{
             ContractRuntimeAnnouncement, ControlAnnouncement, DeployAcceptorAnnouncement,
@@ -70,7 +69,7 @@ enum Event {
     #[from]
     DeployGossiperAnnouncement(#[serde(skip_serializing)] GossiperAnnouncement<Deploy>),
     #[from]
-    ContractRuntime(#[serde(skip_serializing)] contract_runtime::Event),
+    ContractRuntime(#[serde(skip_serializing)] ContractRuntimeRequest),
 }
 
 impl ReactorEvent for Event {
@@ -86,12 +85,6 @@ impl ReactorEvent for Event {
 impl From<StorageRequest> for Event {
     fn from(request: StorageRequest) -> Self {
         Event::Storage(storage::Event::from(request))
-    }
-}
-
-impl From<ContractRuntimeRequest> for Event {
-    fn from(request: ContractRuntimeRequest) -> Self {
-        Event::ContractRuntime(contract_runtime::Event::Request(Box::new(request)))
     }
 }
 
@@ -192,8 +185,6 @@ impl reactor::Reactor for Reactor {
 
         let contract_runtime_config = contract_runtime::Config::default();
         let contract_runtime = ContractRuntime::new(
-            Digest::random(rng),
-            None,
             ProtocolVersion::from_parts(1, 0, 0),
             storage_withdir,
             &contract_runtime_config,

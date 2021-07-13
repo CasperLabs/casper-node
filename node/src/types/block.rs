@@ -46,7 +46,7 @@ use crate::{
         AsymmetricKeyExt,
     },
     rpcs::docs::DocExample,
-    types::{Deploy, DeployHash, DeployOrTransferHash, JsonBlock},
+    types::{error::BlockCreationError, Deploy, DeployHash, DeployOrTransferHash, JsonBlock},
     utils::DisplayIter,
 };
 
@@ -149,6 +149,7 @@ static BLOCK: Lazy<Block> = Lazy::new(|| {
         next_era_validator_weights,
         protocol_version,
     )
+    .expect("could not construct block")
 });
 static JSON_BLOCK: Lazy<JsonBlock> = Lazy::new(|| {
     let block = Block::doc_example().clone();
@@ -1034,7 +1035,7 @@ impl Block {
         finalized_block: FinalizedBlock,
         next_era_validator_weights: Option<BTreeMap<PublicKey, U512>>,
         protocol_version: ProtocolVersion,
-    ) -> Self {
+    ) -> Result<Self, BlockCreationError> {
         let body = BlockBody::new(
             finalized_block.proposer.clone(),
             finalized_block.deploy_hashes,
@@ -1042,13 +1043,22 @@ impl Block {
         );
         let body_hash = body.hash();
 
-        let era_end = finalized_block
-            .era_report
-            .map(|era_report| EraEnd::new(era_report, next_era_validator_weights.unwrap()));
+        let era_end = match (finalized_block.era_report, next_era_validator_weights) {
+            (None, None) => None,
+            (Some(era_report), Some(next_era_validator_weights)) => {
+                Some(EraEnd::new(era_report, next_era_validator_weights))
+            }
+            (maybe_era_report, maybe_next_era_validator_weights) => {
+                return Err(BlockCreationError::CouldNotCreateEraEnd {
+                    maybe_era_report,
+                    maybe_next_era_validator_weights,
+                })
+            }
+        };
 
         let mut accumulated_seed = [0; Digest::LENGTH];
 
-        let mut hasher = VarBlake2b::new(Digest::LENGTH).expect("should create hasher");
+        let mut hasher = VarBlake2b::new(Digest::LENGTH)?;
         hasher.update(parent_seed);
         hasher.update([finalized_block.random_bit as u8]);
         hasher.finalize_variable(|slice| {
@@ -1068,7 +1078,7 @@ impl Block {
             protocol_version,
         };
 
-        Self::new_from_header_and_body(header, body)
+        Ok(Self::new_from_header_and_body(header, body))
     }
 
     pub(crate) fn new_from_header_and_body(header: BlockHeader, body: BlockBody) -> Self {
@@ -1202,6 +1212,7 @@ impl Block {
             next_era_validator_weights,
             protocol_version,
         )
+        .expect("Could not create random block with specifics")
     }
 }
 

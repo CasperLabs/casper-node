@@ -47,14 +47,14 @@ macro_rules! on_fail_charge {
                 warn!("Execution failed: {:?}", exec_err);
                 return ExecutionResult::Failure {
                     error: exec_err.into(),
-                    effect: Default::default(),
+                    execution_effect: Default::default(),
                     transfers: $transfers,
                     cost: $cost,
                 };
             }
         }
     };
-    ($fn:expr, $cost:expr, $effect:expr, $transfers:expr) => {
+    ($fn:expr, $cost:expr, $execution_effect:expr, $transfers:expr) => {
         match $fn {
             Ok(res) => res,
             Err(e) => {
@@ -62,7 +62,7 @@ macro_rules! on_fail_charge {
                 warn!("Execution failed: {:?}", exec_err);
                 return ExecutionResult::Failure {
                     error: exec_err.into(),
-                    effect: $effect,
+                    execution_effect: $execution_effect,
                     transfers: $transfers,
                     cost: $cost,
                 };
@@ -142,7 +142,7 @@ impl Executor {
 
         // Snapshot of effects before execution, so in case of error
         // only nonce update can be returned.
-        let effects_snapshot = tracking_copy.borrow().effect();
+        let execution_effect = tracking_copy.borrow().effect();
 
         let context = RuntimeContext::new(
             tracking_copy,
@@ -200,7 +200,7 @@ impl Executor {
             ) {
                 Ok(_value) => {
                     return ExecutionResult::Success {
-                        effect: runtime.context().effect(),
+                        execution_effect: runtime.context().effect(),
                         transfers: runtime.context().transfers().to_owned(),
                         cost: runtime.context().gas_counter(),
                     };
@@ -208,7 +208,7 @@ impl Executor {
                 Err(error) => {
                     return ExecutionResult::Failure {
                         error: error.into(),
-                        effect: effects_snapshot,
+                        execution_effect,
                         transfers: runtime.context().transfers().to_owned(),
                         cost: runtime.context().gas_counter(),
                     };
@@ -225,7 +225,7 @@ impl Executor {
             ) {
                 Ok(_value) => {
                     return ExecutionResult::Success {
-                        effect: runtime.context().effect(),
+                        execution_effect: runtime.context().effect(),
                         transfers: runtime.context().transfers().to_owned(),
                         cost: runtime.context().gas_counter(),
                     };
@@ -233,7 +233,7 @@ impl Executor {
                 Err(error) => {
                     return ExecutionResult::Failure {
                         error: error.into(),
-                        effect: effects_snapshot,
+                        execution_effect,
                         transfers: runtime.context().transfers().to_owned(),
                         cost: runtime.context().gas_counter(),
                     };
@@ -250,7 +250,7 @@ impl Executor {
             ) {
                 Ok(_value) => {
                     return ExecutionResult::Success {
-                        effect: runtime.context().effect(),
+                        execution_effect: runtime.context().effect(),
                         transfers: runtime.context().transfers().to_owned(),
                         cost: runtime.context().gas_counter(),
                     }
@@ -258,7 +258,7 @@ impl Executor {
                 Err(error) => {
                     return ExecutionResult::Failure {
                         error: error.into(),
-                        effect: effects_snapshot,
+                        execution_effect,
                         transfers: runtime.context().transfers().to_owned(),
                         cost: runtime.context().gas_counter(),
                     }
@@ -268,12 +268,12 @@ impl Executor {
         on_fail_charge!(
             instance.invoke_export(entry_point_name, &[], &mut runtime),
             runtime.context().gas_counter(),
-            effects_snapshot,
+            execution_effect,
             runtime.context().transfers().to_owned()
         );
 
         ExecutionResult::Success {
-            effect: runtime.context().effect(),
+            execution_effect: runtime.context().effect(),
             transfers: runtime.context().transfers().to_owned(),
             cost: runtime.context().gas_counter(),
         }
@@ -343,24 +343,24 @@ impl Executor {
             Err(error) => {
                 return ExecutionResult::Failure {
                     error: error.into(),
-                    effect: Default::default(),
+                    execution_effect: Default::default(),
                     transfers: Vec::default(),
                     cost: Gas::default(),
                 };
             }
         };
 
-        let effects_snapshot = tracking_copy.borrow().effect();
+        let execution_effect = tracking_copy.borrow().effect();
 
         match runtime.call_host_standard_payment() {
             Ok(()) => ExecutionResult::Success {
-                effect: runtime.context().effect(),
+                execution_effect: runtime.context().effect(),
                 transfers: runtime.context().transfers().to_owned(),
                 cost: runtime.context().gas_counter(),
             },
             Err(error) => ExecutionResult::Failure {
                 error: error.into(),
-                effect: effects_snapshot,
+                execution_effect,
                 transfers: runtime.context().transfers().to_owned(),
                 cost: runtime.context().gas_counter(),
             },
@@ -447,7 +447,7 @@ impl Executor {
 
         // Snapshot of effects before execution, so in case of error only nonce update
         // can be returned.
-        let effect_snapshot = tracking_copy.borrow().effect();
+        let execution_effect = tracking_copy.borrow().effect();
 
         let transfers = Vec::default();
 
@@ -477,7 +477,7 @@ impl Executor {
             Ok((instance, runtime)) => (instance, runtime),
             Err(error) => {
                 return ExecutionResult::Failure {
-                    effect: effect_snapshot,
+                    execution_effect,
                     transfers,
                     cost: gas_counter,
                     error: error.into(),
@@ -493,7 +493,7 @@ impl Executor {
             &mut inner_named_keys,
             &runtime_args,
             extra_keys,
-            effect_snapshot,
+            execution_effect,
         );
         *named_keys = inner_named_keys;
         ret
@@ -759,14 +759,14 @@ impl DirectSystemContractCall {
         match result {
             Ok(value) => match value.into_t() {
                 Ok(ret) => ExecutionResult::Success {
-                    effect: runtime.context().effect(),
+                    execution_effect: runtime.context().effect(),
                     transfers: runtime.context().transfers().to_owned(),
                     cost: runtime.context().gas_counter(),
                 }
                 .take_with_ret(ret),
                 Err(error) => ExecutionResult::Failure {
                     error: Error::CLValue(error).into(),
-                    effect: execution_effect,
+                    execution_effect,
                     transfers: runtime.context().transfers().to_owned(),
                     cost: runtime.context().gas_counter(),
                 }
@@ -774,7 +774,7 @@ impl DirectSystemContractCall {
             },
             Err(error) => ExecutionResult::Failure {
                 error: error.into(),
-                effect: execution_effect,
+                execution_effect,
                 transfers: runtime.context().transfers().to_owned(),
                 cost: runtime.context().gas_counter(),
             }

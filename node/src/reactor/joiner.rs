@@ -24,7 +24,7 @@ use crate::{
     components::{
         block_validator::{self, BlockValidator},
         chainspec_loader::{self, ChainspecLoader},
-        contract_runtime::{self, ContractRuntime},
+        contract_runtime::ContractRuntime,
         deploy_acceptor::{self, DeployAcceptor},
         event_stream_server,
         event_stream_server::{DeployGetter, EventStreamServer},
@@ -136,7 +136,7 @@ pub enum Event {
 
     /// Contract Runtime event.
     #[from]
-    ContractRuntime(#[serde(skip_serializing)] contract_runtime::Event),
+    ContractRuntime(#[serde(skip_serializing)] ContractRuntimeRequest),
 
     /// Linear chain event.
     #[from]
@@ -242,12 +242,6 @@ impl From<NetworkRequest<NodeId, gossiper::Message<GossipedAddress>>> for Event 
         Event::SmallNetwork(small_network::Event::from(
             request.map_payload(Message::from),
         ))
-    }
-}
-
-impl From<ContractRuntimeRequest> for Event {
-    fn from(request: ContractRuntimeRequest) -> Event {
-        Event::ContractRuntime(contract_runtime::Event::Request(Box::new(request)))
     }
 }
 
@@ -475,11 +469,7 @@ impl reactor::Reactor for Reactor {
         let deploy_acceptor =
             DeployAcceptor::new(config.deploy_acceptor, &*chainspec_loader.chainspec());
 
-        contract_runtime.set_initial_state(
-            chainspec_loader.initial_state_root_hash(),
-            chainspec_loader.initial_block_header(),
-        );
-
+        contract_runtime.set_initial_state(chainspec_loader.initial_execution_pre_state());
         let linear_chain = linear_chain::LinearChainComponent::new(
             registry,
             *protocol_version,
@@ -506,6 +496,7 @@ impl reactor::Reactor for Reactor {
             chainspec_loader.initial_block().cloned(),
             validator_weights,
             maybe_next_activation_point,
+            chainspec_loader.initial_execution_pre_state(),
         )?;
 
         effects.extend(reactor::wrap_effects(
@@ -775,13 +766,6 @@ impl reactor::Reactor for Reactor {
 
                 effects
             }
-            Event::ContractRuntimeAnnouncement(
-                ContractRuntimeAnnouncement::BlockAlreadyExecuted(block),
-            ) => self.dispatch_event(
-                effect_builder,
-                rng,
-                Event::LinearChainSync(linear_chain_sync::Event::BlockHandled(Box::new(*block))),
-            ),
             Event::ContractRuntimeAnnouncement(ContractRuntimeAnnouncement::StepSuccess {
                 era_id,
                 execution_effect,
@@ -790,7 +774,7 @@ impl reactor::Reactor for Reactor {
                 rng,
                 Event::EventStreamServer(event_stream_server::Event::Step {
                     era_id,
-                    effect: execution_effect,
+                    execution_effect,
                 }),
             ),
             Event::LinearChain(event) => reactor::wrap_effects(

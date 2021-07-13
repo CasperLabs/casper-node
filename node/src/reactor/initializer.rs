@@ -51,8 +51,7 @@ pub enum Event {
     Storage(#[serde(skip_serializing)] storage::Event),
 
     /// Contract runtime event.
-    #[from]
-    ContractRuntime(#[serde(skip_serializing)] contract_runtime::Event),
+    ContractRuntime(#[serde(skip_serializing)] Box<ContractRuntimeRequest>),
 
     /// Request for state storage.
     #[from]
@@ -61,6 +60,12 @@ pub enum Event {
     /// Control announcement
     #[from]
     ControlAnnouncement(ControlAnnouncement),
+}
+
+impl From<ContractRuntimeRequest> for Event {
+    fn from(contract_runtime_request: ContractRuntimeRequest) -> Self {
+        Event::ContractRuntime(Box::new(contract_runtime_request))
+    }
 }
 
 impl ReactorEvent for Event {
@@ -76,12 +81,6 @@ impl ReactorEvent for Event {
 impl From<StorageRequest> for Event {
     fn from(request: StorageRequest) -> Self {
         Event::Storage(storage::Event::StorageRequest(request))
-    }
-}
-
-impl From<ContractRuntimeRequest> for Event {
-    fn from(request: ContractRuntimeRequest) -> Self {
-        Event::ContractRuntime(contract_runtime::Event::Request(Box::new(request)))
     }
 }
 
@@ -199,8 +198,6 @@ impl Reactor {
         )?;
 
         let contract_runtime = ContractRuntime::new(
-            chainspec_loader.initial_state_root_hash(),
-            chainspec_loader.initial_block_header(),
             chainspec_loader.chainspec().protocol_config.version,
             storage_config,
             &config.value().contract_runtime,
@@ -290,9 +287,9 @@ impl reactor::Reactor for Reactor {
                 self.storage.handle_event(effect_builder, rng, event),
             ),
             Event::ContractRuntime(event) => reactor::wrap_effects(
-                Event::ContractRuntime,
+                Event::from,
                 self.contract_runtime
-                    .handle_event(effect_builder, rng, event),
+                    .handle_event(effect_builder, rng, *event),
             ),
             Event::StateStoreRequest(request) => {
                 self.dispatch_event(effect_builder, rng, Event::Storage(request.into()))

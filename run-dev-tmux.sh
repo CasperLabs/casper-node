@@ -144,4 +144,4 @@ main() {
     echo
 }
 
-main ${@}
+main $@

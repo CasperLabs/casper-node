@@ -36,4 +36,4 @@ main() {
     generate_chainspec ${BASEDIR} ${TIMESTAMP}
 }
 
-main ${@}
+main $@

@@ -151,15 +151,6 @@ where
                 }
             }
             .ignore(),
-            Event::Request(LinearChainRequest::BlockAtHeightLocal(height, responder)) => {
-                async move {
-                    let block = effect_builder
-                        .get_block_at_height_from_storage(height)
-                        .await;
-                    responder.respond(block).await
-                }
-                .ignore()
-            }
             Event::Request(LinearChainRequest::BlockAtHeight(height, sender)) => async move {
                 let block_by_height = match effect_builder
                     .get_block_at_height_from_storage(height)

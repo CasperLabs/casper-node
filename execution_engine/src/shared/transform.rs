@@ -23,25 +23,12 @@ use crate::shared::{stored_value::StoredValue, TypeMismatch};
 /// value overflowing its size in memory (e.g. if a, b are i32 and a +
 /// b > i32::MAX then a `AddInt32(a).apply(Value::Int32(b))` would
 /// cause an overflow).
-#[derive(PartialEq, Eq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone, thiserror::Error)]
 pub enum Error {
+    #[error(transparent)]
     Serialization(bytesrepr::Error),
-    TypeMismatch(TypeMismatch),
-}
-
-impl Display for Error {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        match self {
-            Error::Serialization(error) => write!(f, "{}", error),
-            Error::TypeMismatch(error) => write!(f, "{}", error),
-        }
-    }
-}
-
-impl From<TypeMismatch> for Error {
-    fn from(t: TypeMismatch) -> Error {
-        Error::TypeMismatch(t)
-    }
+    #[error(transparent)]
+    TypeMismatch(#[from] TypeMismatch),
 }
 
 impl From<CLValueError> for Error {

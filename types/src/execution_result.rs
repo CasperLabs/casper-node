@@ -169,7 +169,7 @@ impl Distribution<ExecutionResult> for Standard {
             });
         }
 
-        let effect = ExecutionEffect {
+        let execution_effect = ExecutionEffect {
             operations,
             transforms,
         };
@@ -182,14 +182,14 @@ impl Distribution<ExecutionResult> for Standard {
 
         if rng.gen() {
             ExecutionResult::Failure {
-                effect,
+                effect: execution_effect,
                 transfers,
                 cost: rng.gen::<u64>().into(),
                 error_message: format!("Error message {}", rng.gen::<u64>()),
             }
         } else {
             ExecutionResult::Success {
-                effect,
+                effect: execution_effect,
                 transfers,
                 cost: rng.gen::<u64>().into(),
             }
@@ -231,22 +231,22 @@ impl ToBytes for ExecutionResult {
         U8_SERIALIZED_LENGTH
             + match self {
                 ExecutionResult::Failure {
-                    effect,
+                    effect: execution_effect,
                     transfers,
                     cost,
                     error_message,
                 } => {
-                    effect.serialized_length()
+                    execution_effect.serialized_length()
                         + transfers.serialized_length()
                         + cost.serialized_length()
                         + error_message.serialized_length()
                 }
                 ExecutionResult::Success {
-                    effect,
+                    effect: execution_effect,
                     transfers,
                     cost,
                 } => {
-                    effect.serialized_length()
+                    execution_effect.serialized_length()
                         + transfers.serialized_length()
                         + cost.serialized_length()
                 }
@@ -272,11 +272,11 @@ impl FromBytes for ExecutionResult {
                 Ok((execution_result, remainder))
             }
             EXECUTION_RESULT_SUCCESS_TAG => {
-                let (effect, remainder) = ExecutionEffect::from_bytes(remainder)?;
+                let (execution_effect, remainder) = ExecutionEffect::from_bytes(remainder)?;
                 let (transfers, remainder) = Vec::<TransferAddr>::from_bytes(remainder)?;
                 let (cost, remainder) = U512::from_bytes(remainder)?;
                 let execution_result = ExecutionResult::Success {
-                    effect,
+                    effect: execution_effect,
                     transfers,
                     cost,
                 };

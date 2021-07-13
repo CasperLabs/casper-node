@@ -50,59 +50,26 @@ use crate::{
         stored_value::StoredValue,
         system_config::SystemConfig,
         wasm_config::WasmConfig,
-        TypeMismatch,
     },
-    storage::{
-        global_state::{CommitResult, StateProvider},
-        protocol_data::ProtocolData,
-    },
+    storage::{global_state::StateProvider, protocol_data::ProtocolData},
 };
 
 pub const PLACEHOLDER_KEY: Key = Key::Hash([0u8; 32]);
 const TAG_LENGTH: usize = U8_SERIALIZED_LENGTH;
 
-#[derive(Debug, Serialize)]
-pub enum GenesisResult {
-    RootNotFound,
-    KeyNotFound(Key),
-    TypeMismatch(TypeMismatch),
-    Serialization(bytesrepr::Error),
-    Success {
-        post_state_hash: Blake2bHash,
-        #[serde(skip_serializing)]
-        effect: ExecutionEffect,
-    },
+#[derive(Debug)]
+pub struct GenesisSuccess {
+    pub post_state_hash: Blake2bHash,
+    pub execution_effect: ExecutionEffect,
 }
 
-impl fmt::Display for GenesisResult {
+impl fmt::Display for GenesisSuccess {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        match self {
-            GenesisResult::RootNotFound => write!(f, "Root not found"),
-            GenesisResult::KeyNotFound(key) => write!(f, "Key not found: {}", key),
-            GenesisResult::TypeMismatch(type_mismatch) => {
-                write!(f, "Type mismatch: {:?}", type_mismatch)
-            }
-            GenesisResult::Serialization(error) => write!(f, "Serialization error: {:?}", error),
-            GenesisResult::Success {
-                post_state_hash,
-                effect,
-            } => write!(f, "Success: {} {:?}", post_state_hash, effect),
-        }
-    }
-}
-
-impl GenesisResult {
-    pub fn from_commit_result(commit_result: CommitResult, effect: ExecutionEffect) -> Self {
-        match commit_result {
-            CommitResult::RootNotFound => GenesisResult::RootNotFound,
-            CommitResult::KeyNotFound(key) => GenesisResult::KeyNotFound(key),
-            CommitResult::TypeMismatch(type_mismatch) => GenesisResult::TypeMismatch(type_mismatch),
-            CommitResult::Serialization(error) => GenesisResult::Serialization(error),
-            CommitResult::Success { state_root, .. } => GenesisResult::Success {
-                post_state_hash: state_root,
-                effect,
-            },
-        }
+        write!(
+            f,
+            "Success: {} {:?}",
+            self.post_state_hash, self.execution_effect
+        )
     }
 }
 

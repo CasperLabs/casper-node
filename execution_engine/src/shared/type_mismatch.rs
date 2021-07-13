@@ -1,21 +1,10 @@
-use std::fmt;
-
 use serde::{Deserialize, Serialize};
 
-#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, Debug, Clone, Serialize, Deserialize, thiserror::Error)]
+#[error("Type mismatch. Expected {expected} but found {found}.")]
 pub struct TypeMismatch {
     pub expected: String,
     pub found: String,
-}
-
-impl fmt::Display for TypeMismatch {
-    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(
-            f,
-            "Type mismatch. Expected {} but found {}.",
-            self.expected, self.found
-        )
-    }
 }
 
 impl TypeMismatch {

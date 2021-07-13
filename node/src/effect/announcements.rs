@@ -220,8 +220,6 @@ where
 pub enum ContractRuntimeAnnouncement {
     /// A new block from the linear chain was produced.
     LinearChainBlock(Box<LinearChainBlock>),
-    /// A block was requested to be executed, but it had been executed before.
-    BlockAlreadyExecuted(Box<Block>),
     /// A Step succeeded and has altered global state.
     StepSuccess {
         /// The era id in which the step was committed to global state.
@@ -241,10 +239,6 @@ impl ContractRuntimeAnnouncement {
             block,
             execution_results,
         }))
-    }
-    /// Create a ContractRuntimeAnnouncement::BlockAlreadyExecuted from a Block.
-    pub fn block_already_executed(block: Block) -> Self {
-        Self::BlockAlreadyExecuted(Box::new(block))
     }
 
     /// Create a ContractRuntimeAnnouncement::StepSuccess from an execution effect.
@@ -274,9 +268,6 @@ impl Display for ContractRuntimeAnnouncement {
                     "created linear chain block {}",
                     linear_chain_block.block.hash()
                 )
-            }
-            ContractRuntimeAnnouncement::BlockAlreadyExecuted(block) => {
-                write!(f, "block had been executed before: {}", block.hash())
             }
             ContractRuntimeAnnouncement::StepSuccess { era_id, .. } => {
                 write!(f, "step completed for {}", era_id)

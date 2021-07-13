@@ -4,6 +4,7 @@ pub(crate) mod appendable_block;
 mod block;
 pub mod chainspec;
 mod deploy;
+pub mod error;
 mod exit_code;
 mod item;
 pub mod json_compatibility;

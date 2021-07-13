@@ -1,14 +1,14 @@
-use std::{collections::BTreeMap, fmt::Display, vec::Vec};
-
-use core::fmt;
-use uint::static_assertions::_core::fmt::Formatter;
+use std::{collections::BTreeMap, vec::Vec};
 
 use casper_types::{
     bytesrepr, bytesrepr::ToBytes, CLValueError, EraId, Key, ProtocolVersion, PublicKey, U512,
 };
 
 use crate::{
-    core::engine_state::{execution_effect::ExecutionEffect, Error, GetEraValidatorsError},
+    core::{
+        engine_state::{execution_effect::ExecutionEffect, Error, GetEraValidatorsError},
+        execution,
+    },
     shared::{newtypes::Blake2bHash, TypeMismatch},
 };
 
@@ -104,32 +104,47 @@ impl StepRequest {
     }
 }
 
-#[derive(Debug)]
-pub enum StepResult {
-    RootNotFound,
+#[derive(Debug, thiserror::Error)]
+pub enum StepError {
+    #[error("Root not found: {0:?}")]
+    RootNotFound(Blake2bHash),
+    #[error("Get protocol data error: {0}")]
     GetProtocolDataError(Error),
+    #[error("Tracking copy error: {0}")]
     TrackingCopyError(Error),
+    #[error("Get contract error: {0}")]
     GetContractError(Error),
+    #[error("Get system module error: {0}")]
     GetSystemModuleError(Error),
+    #[error("Slashing error: {0}")]
     SlashingError(Error),
+    #[error("Auction error: {0}")]
     AuctionError(Error),
+    #[error("Distribute error: {0}")]
     DistributeError(Error),
-    InvalidProtocolVersion,
+    #[error("Invalid protocol version: {0}")]
+    InvalidProtocolVersion(ProtocolVersion),
+    #[error("Key not found: {0}")]
     KeyNotFound(Key),
+    #[error("Type mismatch: {0}")]
     TypeMismatch(TypeMismatch),
-    Serialization(bytesrepr::Error),
-    CLValueError(CLValueError),
-    GetEraValidatorsError(GetEraValidatorsError),
+    #[error("Era validators missing: {0}")]
     EraValidatorsMissing(EraId),
-    Success {
-        post_state_hash: Blake2bHash,
-        next_era_validators: BTreeMap<PublicKey, U512>,
-        execution_effect: ExecutionEffect,
-    },
+    #[error(transparent)]
+    BytesRepr(#[from] bytesrepr::Error),
+    #[error(transparent)]
+    CLValueError(#[from] CLValueError),
+    #[error(transparent)]
+    GetEraValidatorsError(#[from] GetEraValidatorsError),
+    #[error("Other engine state error: {0}")]
+    OtherEngineStateError(#[from] Error),
+    #[error(transparent)]
+    ExecutionError(#[from] execution::Error),
 }
 
-impl Display for StepResult {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "{:?}", self)
-    }
+#[derive(Debug)]
+pub struct StepSuccess {
+    pub post_state_hash: Blake2bHash,
+    pub next_era_validators: BTreeMap<PublicKey, U512>,
+    pub execution_effect: ExecutionEffect,
 }

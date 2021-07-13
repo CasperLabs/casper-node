@@ -5,27 +5,24 @@ use thiserror::Error;
 
 use casper_types::bytesrepr;
 
-use crate::storage::error::in_memory;
+use crate::storage::{error::in_memory, global_state::CommitError};
 
 #[derive(Debug, Clone, Error, PartialEq, Eq)]
 pub enum Error {
     #[error(transparent)]
     Lmdb(#[from] lmdb_external::Error),
 
-    #[error("{0}")]
-    BytesRepr(bytesrepr::Error),
+    #[error(transparent)]
+    BytesRepr(#[from] bytesrepr::Error),
 
     #[error("Another thread panicked while holding a lock")]
     Poison,
+
+    #[error(transparent)]
+    CommitError(#[from] CommitError),
 }
 
 impl wasmi::HostError for Error {}
-
-impl From<bytesrepr::Error> for Error {
-    fn from(error: bytesrepr::Error) -> Self {
-        Error::BytesRepr(error)
-    }
-}
 
 impl<T> From<sync::PoisonError<T>> for Error {
     fn from(_error: sync::PoisonError<T>) -> Self {

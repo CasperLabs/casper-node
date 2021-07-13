@@ -10,6 +10,7 @@ use crate::{
     },
     shared::{newtypes::Blake2bHash, wasm_prep},
     storage,
+    storage::global_state::CommitError,
 };
 
 #[derive(Clone, Error, Debug)]
@@ -54,6 +55,8 @@ pub enum Error {
     ProtocolUpgrade(ProtocolUpgradeError),
     #[error("Unsupported deploy item variant: {0}")]
     InvalidDeployItemVariant(String),
+    #[error(transparent)]
+    CommitError(#[from] CommitError),
 }
 
 impl From<execution::Error> for Error {

@@ -10,7 +10,7 @@ use casper_types::{Key, ProtocolVersion};
 
 use crate::storage::{
     error,
-    global_state::{commit, CommitResult, StateProvider, StateReader},
+    global_state::{commit, StateProvider, StateReader},
     protocol_data::ProtocolData,
     protocol_data_store::lmdb::LmdbProtocolDataStore,
     store::Store,
@@ -175,15 +175,15 @@ impl StateProvider for LmdbGlobalState {
         correlation_id: CorrelationId,
         prestate_hash: Blake2bHash,
         effects: AdditiveMap<Key, Transform>,
-    ) -> Result<CommitResult, Self::Error> {
-        let commit_result = commit::<LmdbEnvironment, LmdbTrieStore, _, Self::Error>(
+    ) -> Result<Blake2bHash, Self::Error> {
+        commit::<LmdbEnvironment, LmdbTrieStore, _, Self::Error>(
             &self.environment,
             &self.trie_store,
             correlation_id,
             prestate_hash,
             effects,
-        )?;
-        Ok(commit_result)
+        )
+        .map_err(Into::into)
     }
 
     fn put_protocol_data(
@@ -386,10 +386,7 @@ mod tests {
             tmp
         };
 
-        let updated_hash = match state.commit(correlation_id, root_hash, effects).unwrap() {
-            CommitResult::Success { state_root, .. } => state_root,
-            _ => panic!("commit failed"),
-        };
+        let updated_hash = state.commit(correlation_id, root_hash, effects).unwrap();
 
         let updated_checkout = state.checkout(updated_hash).unwrap().unwrap();
 
@@ -416,10 +413,7 @@ mod tests {
             tmp
         };
 
-        let updated_hash = match state.commit(correlation_id, root_hash, effects).unwrap() {
-            CommitResult::Success { state_root, .. } => state_root,
-            _ => panic!("commit failed"),
-        };
+        let updated_hash = state.commit(correlation_id, root_hash, effects).unwrap();
 
         let updated_checkout = state.checkout(updated_hash).unwrap().unwrap();
         for TestPair { key, value } in test_pairs_updated.iter().cloned() {
