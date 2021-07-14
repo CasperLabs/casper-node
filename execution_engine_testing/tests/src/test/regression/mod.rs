@@ -10,6 +10,7 @@ mod ee_1163;
 mod ee_1174;
 mod ee_1217;
 mod ee_1217_mint_proxy;
+mod ee_1225;
 mod ee_221;
 mod ee_401;
 mod ee_441;

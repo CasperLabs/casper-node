@@ -141,6 +141,15 @@ mod internal {
         debug_assert_eq!(validator_reward + refund_amount, total);
 
         let refund_purse = get_refund_purse(provider)?;
+
+        if let Some(refund_purse) = refund_purse {
+            if refund_purse.remove_access_rights() == payment_purse.remove_access_rights() {
+                // Make sure we're not refunding into a payment purse to invalidate payment code
+                // postconditions.
+                return Err(Error::RefundPurseIsPaymentPurse);
+            }
+        }
+
         provider.remove_key(REFUND_PURSE_KEY)?; //unset refund purse after reading it
 
         // pay target validator

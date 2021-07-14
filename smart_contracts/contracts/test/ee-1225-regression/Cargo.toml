@@ -1,0 +1,19 @@
+[package]
+name = "ee-1225-regression"
+version = "0.1.0"
+authors = ["Michał Papierski <michal@casperlabs.io>"]
+edition = "2018"
+
+[[bin]]
+name = "ee_1225_regression"
+path = "src/main.rs"
+bench = false
+doctest = false
+test = false
+
+[features]
+std = ["casper-contract/std", "casper-types/std"]
+
+[dependencies]
+casper-contract = { path = "../../../contract" }
+casper-types = { path = "../../../../types" }

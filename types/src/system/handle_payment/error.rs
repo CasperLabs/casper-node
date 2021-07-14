@@ -129,6 +129,9 @@ pub enum Error {
     #[doc(hidden)]
     #[cfg_attr(feature = "std", error("GasLimit"))]
     GasLimit,
+    /// Refund purse is a payment purse.
+    #[cfg_attr(feature = "std", error("Refund purse is a payment purse."))]
+    RefundPurseIsPaymentPurse,
 }
 
 impl CLTyped for Error {
