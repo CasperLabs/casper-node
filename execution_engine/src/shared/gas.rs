@@ -10,7 +10,7 @@ use crate::shared::motes::Motes;
 pub struct Gas(U512);
 
 impl Gas {
-    pub fn new(value: U512) -> Self {
+    pub const fn new(value: U512) -> Self {
         Gas(value)
     }
 

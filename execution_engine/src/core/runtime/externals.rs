@@ -16,7 +16,6 @@ use super::{args::Args, scoped_instrumenter::ScopedInstrumenter, Error, Runtime}
 use crate::{
     core::resolvers::v1_function_index::FunctionIndex,
     shared::{
-        gas::Gas,
         host_function_costs::{Cost, HostFunction, DEFAULT_HOST_FUNCTION_NEW_DICTIONARY},
         stored_value::StoredValue,
     },
@@ -207,7 +206,7 @@ where
                 let (gas_arg,): (u32,) = Args::parse(args)?;
                 // Gas is special cased internal host function and for accounting purposes it isn't
                 // represented in protocol data.
-                self.gas(Gas::new(gas_arg.into()))?;
+                self.gas(gas_arg as u64)?;
                 Ok(None)
             }
 

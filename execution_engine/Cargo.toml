@@ -65,3 +65,7 @@ test-support = []
 name = "trie_bench"
 harness = false
 
+[[bench]]
+name = "runtime_bench"
+harness = false
+

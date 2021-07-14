@@ -9,7 +9,7 @@ use casper_types::{
 
 use crate::{
     core::resolvers::error::ResolverError,
-    shared::{wasm_prep, TypeMismatch},
+    shared::{gas_counter::error::GasLimitError, wasm_prep, TypeMismatch},
     storage,
 };
 
@@ -113,6 +113,12 @@ impl From<wasm_prep::PreprocessingError> for Error {
 impl From<pwasm_utils::OptimizerError> for Error {
     fn from(_optimizer_error: pwasm_utils::OptimizerError) -> Self {
         Error::WasmOptimizer
+    }
+}
+
+impl From<GasLimitError> for Error {
+    fn from(_: GasLimitError) -> Self {
+        Error::GasLimit
     }
 }
 

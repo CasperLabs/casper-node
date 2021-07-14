@@ -11,7 +11,7 @@ use casper_execution_engine::{
         runtime::{self, Runtime},
         runtime_context::RuntimeContext,
     },
-    shared::{gas::Gas, newtypes::CorrelationId, wasm_prep::Preprocessor},
+    shared::{gas::Gas, gas_counter::GasCounter, newtypes::CorrelationId, wasm_prep::Preprocessor},
     storage::{global_state::StateProvider, protocol_data::ProtocolData},
 };
 use casper_types::{
@@ -65,12 +65,11 @@ where
         let address_generator = AddressGenerator::new(deploy_hash.as_bytes(), phase);
         Rc::new(RefCell::new(address_generator))
     };
-    let gas_counter = Gas::default();
     let fn_store_id = {
         let fn_store_id = AddressGenerator::new(deploy_hash.as_bytes(), phase);
         Rc::new(RefCell::new(fn_store_id))
     };
-    let gas_limit = Gas::new(U512::from(std::u64::MAX));
+    let gas_counter = GasCounter::new(Gas::new(U512::from(std::u64::MAX)), Gas::default());
     let protocol_version = ProtocolVersion::V1_0_0;
     let correlation_id = CorrelationId::new();
     let base_key = Key::Account(address);
@@ -114,7 +113,6 @@ where
         base_key,
         BlockTime::new(block_time),
         deploy_hash,
-        gas_limit,
         gas_counter,
         fn_store_id,
         address_generator,
