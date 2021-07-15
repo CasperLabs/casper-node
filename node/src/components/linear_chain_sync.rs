@@ -70,6 +70,8 @@ pub use metrics::LinearChainSyncMetrics;
 pub use peers::PeersState;
 pub use state::State;
 pub use traits::ReactorEventT;
+// TODO: Move this out of linear_chain_sync.
+pub(crate) use operations::weigh_finality_signatures;
 
 #[derive(DataSize, Debug)]
 pub(crate) struct LinearChainSync<I> {

@@ -36,7 +36,7 @@ use crate::{
         event_stream_server::{self, EventStreamServer},
         fetcher::{self, FetchedOrNotFound, Fetcher},
         gossiper::{self, Gossiper},
-        linear_chain,
+        linear_chain, linear_chain_sync,
         metrics::Metrics,
         network::{self, Network, NetworkIdentity, ENABLE_LIBP2P_NET_ENV_VAR},
         rest_server::{self, RestServer},
@@ -491,8 +491,7 @@ impl reactor::Reactor for Reactor {
         let linear_chain = linear_chain::LinearChainComponent::new(
             &registry,
             *protocol_version,
-            chainspec_loader.chainspec().core_config.auction_delay,
-            chainspec_loader.chainspec().core_config.unbonding_delay,
+            chainspec_loader.chainspec().clone(),
         )?;
 
         effects.extend(reactor::wrap_effects(Event::Network, network_effects));
@@ -783,36 +782,51 @@ impl reactor::Reactor for Reactor {
                                     return Effects::new();
                                 }
                             };
-                            let fetched_or_not_found_block_header_and_finality_signatures =
-                                match self
-                                    .storage
-                                    .read_block_header_and_finality_signatures_by_height(
-                                        block_height,
-                                    ) {
-                                    Ok(Some(block_header)) => {
-                                        FetchedOrNotFound::Fetched(block_header)
-                                    }
-                                    Ok(None) => FetchedOrNotFound::NotFound(block_height),
-                                    Err(error) => {
-                                        error!(
-                                            "failed to get {} for {}: {}",
-                                            block_height, sender, error
-                                        );
-                                        FetchedOrNotFound::NotFound(block_height)
-                                    }
-                                };
+                            let maybe_header_with_sigs = self
+                                .storage
+                                .read_block_header_and_finality_signatures_by_height(block_height)
+                                .unwrap_or_else(|error| {
+                                    error!(
+                                        "failed to get {} for {}: {}",
+                                        block_height, sender, error
+                                    );
+                                    None
+                                });
+                            let chainspec = Arc::clone(self.chainspec_loader.chainspec());
 
-                            match Message::new_get_response(
-                                &fetched_or_not_found_block_header_and_finality_signatures,
-                            ) {
-                                Ok(message) => {
-                                    return effect_builder.send_message(sender, message).ignore();
+                            return async move {
+                                let mut fully_signed = false;
+                                if let Some(header_with_sigs) = &maybe_header_with_sigs {
+                                    if let Some(validator_weights) = effect_builder
+                                        .get_era_validators(header_with_sigs.block_header.era_id())
+                                        .await
+                                    {
+                                        fully_signed =
+                                            linear_chain_sync::weigh_finality_signatures(
+                                                &validator_weights,
+                                                chainspec
+                                                    .highway_config
+                                                    .finality_threshold_fraction,
+                                                &header_with_sigs.block_signatures,
+                                            )
+                                            .is_ok();
+                                    }
                                 }
-                                Err(error) => {
-                                    error!("failed to create get-response: {}", error);
-                                    return Effects::new();
+                                let fetch_or_not_found_header_with_sigs =
+                                    match maybe_header_with_sigs.filter(|_| fully_signed) {
+                                        None => FetchedOrNotFound::NotFound(block_height),
+                                        Some(header) => FetchedOrNotFound::Fetched(header),
+                                    };
+                                match Message::new_get_response(
+                                    &fetch_or_not_found_header_with_sigs,
+                                ) {
+                                    Ok(message) => {
+                                        effect_builder.send_message(sender, message).await
+                                    }
+                                    Err(error) => error!("failed to create get-response {}", error),
                                 }
-                            };
+                            }
+                            .ignore();
                         }
                         Tag::Trie => {
                             let trie_key: Blake2bHash = match bincode::deserialize(&serialized_id) {

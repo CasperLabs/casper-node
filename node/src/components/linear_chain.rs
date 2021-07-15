@@ -6,7 +6,7 @@ mod signature_cache;
 mod state;
 
 use datasize::DataSize;
-use std::{convert::Infallible, fmt::Display, marker::PhantomData};
+use std::{convert::Infallible, fmt::Display, marker::PhantomData, sync::Arc};
 
 use itertools::Itertools;
 use prometheus::Registry;
@@ -29,6 +29,7 @@ use crate::{
         EffectBuilder, EffectExt, EffectResultExt, Effects,
     },
     protocol::Message,
+    types::Chainspec,
     NodeRng,
 };
 
@@ -41,6 +42,7 @@ pub(crate) struct LinearChainComponent<I> {
     linear_chain_state: LinearChain,
     #[data_size(skip)]
     metrics: LinearChainMetrics,
+    chainspec: Arc<Chainspec>,
     _marker: PhantomData<I>,
 }
 
@@ -48,14 +50,16 @@ impl<I> LinearChainComponent<I> {
     pub(crate) fn new(
         registry: &Registry,
         protocol_version: ProtocolVersion,
-        auction_delay: u64,
-        unbonding_delay: u64,
+        chainspec: Arc<Chainspec>,
     ) -> Result<Self, prometheus::Error> {
         let metrics = LinearChainMetrics::new(registry)?;
+        let auction_delay = chainspec.core_config.auction_delay;
+        let unbonding_delay = chainspec.core_config.unbonding_delay;
         let linear_chain_state = LinearChain::new(protocol_version, auction_delay, unbonding_delay);
         Ok(LinearChainComponent {
             linear_chain_state,
             metrics,
+            chainspec,
             _marker: PhantomData,
         })
     }
@@ -155,21 +159,12 @@ where
             }
             .ignore(),
             Event::Request(LinearChainRequest::BlockWithMetadataAtHeight(height, sender)) => {
-                async move {
-                    let fetch_or_not_found_block_with_metadata = match effect_builder
-                        .get_block_at_height_with_metadata_from_storage(height)
-                        .await
-                    {
-                        None => FetchedOrNotFound::NotFound(height),
-                        Some(block) => FetchedOrNotFound::Fetched(block),
-                    };
-                    match Message::new_get_response(&fetch_or_not_found_block_with_metadata) {
-                        Ok(message) => effect_builder.send_message(sender, message).await,
-                        Err(error) => {
-                            error!("failed to create get-response {}", error);
-                        }
-                    }
-                }
+                handle_block_with_metadata_at_height_request(
+                    self.chainspec.clone(),
+                    effect_builder,
+                    height,
+                    sender,
+                )
                 .ignore()
             }
             Event::NewLinearChainBlock {
@@ -213,6 +208,52 @@ where
                 self.linear_chain_state.set_latest_block(*block);
                 Effects::new()
             }
+        }
+    }
+}
+
+/// Handles a request for a block with finality signatures. Sends them to the peer only if we
+/// have a block in storage at the specified height, and the finality signatures' total weight
+/// exceeds the configured finality threshold.
+async fn handle_block_with_metadata_at_height_request<REv, I>(
+    chainspec: Arc<Chainspec>,
+    effect_builder: EffectBuilder<REv>,
+    height: u64,
+    sender: I,
+) where
+    REv: From<StorageRequest>
+        + From<NetworkRequest<I, Message>>
+        + From<ContractRuntimeRequest>
+        + From<ChainspecLoaderRequest>
+        + Send,
+    I: Display + Send + 'static,
+{
+    let maybe_block_with_metadata = effect_builder
+        .get_block_at_height_with_metadata_from_storage(height)
+        .await;
+    let mut fully_signed = false;
+    if let Some(block_with_metadata) = &maybe_block_with_metadata {
+        if let Some(validator_weights) = effect_builder
+            .get_era_validators(block_with_metadata.block.header().era_id())
+            .await
+        {
+            fully_signed = super::linear_chain_sync::weigh_finality_signatures(
+                &validator_weights,
+                chainspec.highway_config.finality_threshold_fraction,
+                &block_with_metadata.finality_signatures,
+            )
+            .is_ok();
+        }
+    }
+    let fetch_or_not_found_block_with_metadata =
+        match maybe_block_with_metadata.filter(|_| fully_signed) {
+            None => FetchedOrNotFound::NotFound(height),
+            Some(block) => FetchedOrNotFound::Fetched(block),
+        };
+    match Message::new_get_response(&fetch_or_not_found_block_with_metadata) {
+        Ok(message) => effect_builder.send_message(sender, message).await,
+        Err(error) => {
+            error!("failed to create get-response {}", error);
         }
     }
 }

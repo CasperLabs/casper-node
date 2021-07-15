@@ -193,7 +193,18 @@ fn validate_finality_signatures(
 
     // Cryptographically verify block signatures
     block_signatures.verify()?;
+    weigh_finality_signatures(
+        trusted_validator_weights,
+        finality_threshold_fraction,
+        block_signatures,
+    )
+}
 
+pub(crate) fn weigh_finality_signatures(
+    trusted_validator_weights: &BTreeMap<PublicKey, U512>,
+    finality_threshold_fraction: Ratio<u64>,
+    block_signatures: &BlockSignatures,
+) -> Result<(), FinalitySignatureError> {
     // Calculate the weight of the signatures
     let mut signature_weight: U512 = U512::zero();
     for (public_key, _) in block_signatures.proofs.iter() {
