@@ -7,7 +7,7 @@ use once_cell::sync::Lazy;
 use casper_engine_test_support::{
     internal::{
         utils, ExecuteRequestBuilder, InMemoryWasmTestBuilder, DEFAULT_ACCOUNTS,
-        DEFAULT_AUCTION_DELAY, DEFAULT_GENESIS_TIMESTAMP_MILLIS,
+        DEFAULT_AUCTION_DELAY, DEFAULT_EXEC_CONFIG, DEFAULT_GENESIS_TIMESTAMP_MILLIS,
         DEFAULT_LOCKED_FUNDS_PERIOD_MILLIS, DEFAULT_RUN_GENESIS_REQUEST, DEFAULT_UNBONDING_DELAY,
         SYSTEM_ADDR, TIMESTAMP_MILLIS_INCREMENT,
     },
@@ -36,7 +36,7 @@ use casper_types::{
             ERA_ID_KEY, INITIAL_ERA_ID,
         },
     },
-    EraId, PublicKey, RuntimeArgs, SecretKey, U512,
+    EraId, PublicKey, RuntimeArgs, SecretKey, U256, U512,
 };
 
 const ARG_TARGET: &str = "target";
@@ -2949,4 +2949,51 @@ fn should_validate_genesis_delegators_bond_amount() {
     let mut builder = InMemoryWasmTestBuilder::default();
 
     builder.run_genesis(&run_genesis_request);
+}
+
+fn check_validator_slots_for_accounts(accounts: usize) {
+    let accounts = {
+        let range = 1..=accounts;
+
+        let mut tmp: Vec<GenesisAccount> = Vec::with_capacity(accounts);
+
+        for count in range.map(U256::from) {
+            let secret_key = {
+                let mut secret_key_bytes = [0; 32];
+                count.to_big_endian(&mut secret_key_bytes);
+                SecretKey::ed25519_from_bytes(&secret_key_bytes).expect("should create ed25519 key")
+            };
+
+            let public_key = PublicKey::from(&secret_key);
+
+            let account = GenesisAccount::account(
+                public_key,
+                Motes::new(DEFAULT_ACCOUNT_INITIAL_BALANCE.into()),
+                Some(GenesisValidator::new(Motes::new(ACCOUNT_1_BOND.into()), 80)),
+            );
+
+            tmp.push(account)
+        }
+
+        tmp
+    };
+
+    let run_genesis_request = utils::create_run_genesis_request(accounts);
+
+    let mut builder = InMemoryWasmTestBuilder::default();
+
+    builder.run_genesis(&run_genesis_request);
+}
+
+#[should_panic(expected = "InvalidValidatorSlots")]
+#[ignore]
+#[test]
+fn should_fail_with_more_accounts_than_slots() {
+    check_validator_slots_for_accounts(DEFAULT_EXEC_CONFIG.validator_slots() as usize + 1);
+}
+
+#[ignore]
+#[test]
+fn should_run_genesis_with_exact_validator_slots() {
+    check_validator_slots_for_accounts(DEFAULT_EXEC_CONFIG.validator_slots() as usize);
 }
