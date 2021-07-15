@@ -1,0 +1,60 @@
+{
+  "SerializeBool": {
+    "input": [
+      {
+        "type": "Bool",
+        "value": true
+      },
+      {
+        "type": "Bool",
+        "value": false
+      }
+    ],
+    "output": "0100"
+  },
+  "SerializeString": {
+    "input": [
+      {
+        "type": "String",
+        "value": "Hello, world!"
+      }
+    ],
+    "output": "0d00000048656c6c6f2c20776f726c6421"
+  },
+  "SerializeU16": {
+    "input": [
+      {
+        "type": "U16",
+        "value": 62356
+      }
+    ],
+    "output": "94f3"
+  },
+  "SerializeU32": {
+    "input": [
+      {
+        "type": "U32",
+        "value": 3490072870
+      }
+    ],
+    "output": "264906d0"
+  },
+  "SerializeU64": {
+    "input": [
+      {
+        "type": "U64",
+        "value": 10829133186225377555
+      }
+    ],
+    "output": "13915bf641cf4896"
+  },
+  "SerializeU8": {
+    "input": [
+      {
+        "type": "U8",
+        "value": 254
+      }
+    ],
+    "output": "fe"
+  }
+}

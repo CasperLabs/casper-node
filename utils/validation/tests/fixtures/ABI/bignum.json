@@ -1,0 +1,47 @@
+{
+    "U512_zero": {
+        "input": [
+            [
+                "U512",
+                "0"
+            ]
+        ],
+        "output": "00"
+    },
+    "U512_one": {
+        "input": [
+            [
+                "U512",
+                "1"
+            ]
+        ],
+        "output": "0101"
+    },
+    "U512_u32_max_value": {
+        "input": [
+            [
+                "U512",
+                "4294967294"
+            ]
+        ],
+        "output": "04feffffff"
+    },
+    "U512_u64_max_value_plus_one": {
+        "input": [
+            [
+                "U512",
+                "18446744073709551616"
+            ]
+        ],
+        "output": "09000000000000000001"
+    },
+    "U512_max": {
+        "input": [
+            [
+                "U512",
+                "13407807929942597099574024998205846127479365820592393377723561443721764030073546976801874298166903427690031858186486050853753882811946569946433649006084095"
+            ]
+        ],
+        "output": "40ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    }
+}

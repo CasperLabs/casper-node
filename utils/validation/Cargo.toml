@@ -1,0 +1,26 @@
+[package]
+name = "casper-validation"
+version = "0.1.0"
+authors = ["Michał Papierski <michal@casperlabs.io>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+casper-types = { version = "1.0.0", path = "../../types", features = ["std"] }
+hex = { version = "0.4.2", features = ["serde"] }
+serde = "1"
+serde_json = "1"
+thiserror = "1.0.18"
+base16 = "0.2.1"
+clap = "3.0.0-beta.2"
+derive_more = "0.99.13"
+anyhow = "1"
+casper-execution-engine = { version = "1.0.0", path = "../../execution_engine" }
+
+[dev-dependencies]
+rustc-test = "0.3.1"
+
+[[test]]
+name = "validation_test"
+harness = false

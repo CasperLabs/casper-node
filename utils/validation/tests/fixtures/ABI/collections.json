@@ -1,0 +1,23 @@
+{
+    "VectorOfStrings": {
+        "input": [
+            [
+                "U32",
+                3
+            ],
+            [
+                "String",
+                "Hello"
+            ],
+            [
+                "String",
+                "world"
+            ],
+            [
+                "String",
+                "!"
+            ]
+        ],
+        "output": "030000000500000048656c6c6f05000000776f726c640100000021"
+    }
+}

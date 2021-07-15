@@ -1,0 +1,90 @@
+{
+    "Account": {
+        "input": [
+            [
+                "Key",
+                {
+                    "Account": "account-hash-d8236074747d4745d7033adf47dc4b79850acb3f29173eefdb0f25f52ee01ab3"
+                }
+            ]
+        ],
+        "output": "00d8236074747d4745d7033adf47dc4b79850acb3f29173eefdb0f25f52ee01ab3"
+    },
+    "URef": {
+        "input": [
+            [
+                "Key",
+                {
+                    "URef": "uref-b1c836c0205e03c53a806e1d7a013fcda10b333fc924bbb7db1c215ad1bef243-000"
+                }
+            ]
+        ],
+        "output": "02b1c836c0205e03c53a806e1d7a013fcda10b333fc924bbb7db1c215ad1bef24300"
+    },
+    "Transfer": {
+        "input": [
+            [
+                "Key",
+                {
+                    "Transfer": "transfer-1f3dfafe6cd430b3aa21dc94ab4e23d69da136d49d752a8b6c078c7409783097"
+                }
+            ]
+        ],
+        "output": "031f3dfafe6cd430b3aa21dc94ab4e23d69da136d49d752a8b6c078c7409783097"
+    },
+    "DeployInfo": {
+        "input": [
+            [
+                "Key",
+                {
+                    "DeployInfo": "deploy-20e87bf66de220bbae46c638c53ed5b1772a8431f52a53f76b59d8b84904fe3f"
+                }
+            ]
+        ],
+        "output": "0420e87bf66de220bbae46c638c53ed5b1772a8431f52a53f76b59d8b84904fe3f"
+    },
+    "EraInfo": {
+        "input": [
+            [
+                "Key",
+                {
+                    "EraInfo": "era-126402"
+                }
+            ]
+        ],
+        "output": "05c2ed010000000000"
+    },
+    "Balance": {
+        "input": [
+            [
+                "Key",
+                {
+                    "Balance": "balance-0a55eff764d397fea51e66daff6781f8ab4e69cc1deb19b9f27241f9b7f0e56c"
+                }
+            ]
+        ],
+        "output": "060a55eff764d397fea51e66daff6781f8ab4e69cc1deb19b9f27241f9b7f0e56c"
+    },
+    "Bid": {
+        "input": [
+            [
+                "Key",
+                {
+                    "Bid": "bid-a622007bc001943b2de83e34c442a6487d395127b6b9d964df712e0023957a22"
+                }
+            ]
+        ],
+        "output": "07a622007bc001943b2de83e34c442a6487d395127b6b9d964df712e0023957a22"
+    },
+    "Withdraw": {
+        "input": [
+            [
+                "Key",
+                {
+                    "Withdraw": "withdraw-f9f141d6bcc49e4e140ca2ce03ab0dff35b3754e6438a905a875e66e009b8ed9"
+                }
+            ]
+        ],
+        "output": "08f9f141d6bcc49e4e140ca2ce03ab0dff35b3754e6438a905a875e66e009b8ed9"
+    }
+}

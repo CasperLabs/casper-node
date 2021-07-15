@@ -559,7 +559,12 @@ impl ToBytes for Transform {
             Transform::AddUInt512(value) => value.serialized_length() + U8_SERIALIZED_LENGTH,
             Transform::AddKeys(value) => value.serialized_length() + U8_SERIALIZED_LENGTH,
             Transform::Failure(value) => value.serialized_length() + U8_SERIALIZED_LENGTH,
-            _ => U8_SERIALIZED_LENGTH,
+            Transform::Identity
+            | Transform::WriteContractWasm
+            | Transform::WriteContract
+            | Transform::WriteContractPackage => U8_SERIALIZED_LENGTH,
+            Transform::WriteBid(value) => value.serialized_length() + U8_SERIALIZED_LENGTH,
+            Transform::WriteWithdraw(value) => value.serialized_length() + U8_SERIALIZED_LENGTH,
         }
     }
 }

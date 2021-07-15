@@ -1,0 +1,265 @@
+{
+  "AddInt32": {
+    "input": [
+      {
+        "type": "Transform",
+        "value": {
+          "AddInt32": 2147483647
+        }
+      }
+    ],
+    "output": "0bffffff7f"
+  },
+  "AddKeys": {
+    "input": [
+      {
+        "type": "Transform",
+        "value": {
+          "AddKeys": [
+            {
+              "name": "key 1",
+              "key": "hash-2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a"
+            },
+            {
+              "name": "uref",
+              "key": "uref-2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b-007"
+            }
+          ]
+        }
+      }
+    ],
+    "output": "1002000000050000006b6579203145000000686173682d32613261326132613261326132613261326132613261326132613261326132613261326132613261326132613261326132613261326132613261326132613261040000007572656649000000757265662d326232623262326232623262326232623262326232623262326232623262326232623262326232623262326232623262326232623262326232623262326232622d303037"
+  },
+  "AddUInt128": {
+    "input": [
+      {
+        "type": "Transform",
+        "value": {
+          "AddUInt128": "340282366920938463463374607431768211455"
+        }
+      }
+    ],
+    "output": "0d10ffffffffffffffffffffffffffffffff"
+  },
+  "AddUInt256": {
+    "input": [
+      {
+        "type": "Transform",
+        "value": {
+          "AddUInt256": "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+        }
+      }
+    ],
+    "output": "0e20ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+  },
+  "AddUInt512": {
+    "input": [
+      {
+        "type": "Transform",
+        "value": {
+          "AddUInt512": "13407807929942597099574024998205846127479365820592393377723561443721764030073546976801874298166903427690031858186486050853753882811946569946433649006084095"
+        }
+      }
+    ],
+    "output": "0f40ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+  },
+  "AddUInt64": {
+    "input": [
+      {
+        "type": "Transform",
+        "value": {
+          "AddUInt64": 18446744073709551615
+        }
+      }
+    ],
+    "output": "0cffffffffffffffff"
+  },
+  "Failure": {
+    "input": [
+      {
+        "type": "Transform",
+        "value": {
+          "Failure": "This is error message"
+        }
+      }
+    ],
+    "output": "111500000054686973206973206572726f72206d657373616765"
+  },
+  "Identity": {
+    "input": [
+      {
+        "type": "Transform",
+        "value": "Identity"
+      }
+    ],
+    "output": "00"
+  },
+  "WriteAccount": {
+    "input": [
+      {
+        "type": "Transform",
+        "value": {
+          "WriteAccount": "account-hash-2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a"
+        }
+      }
+    ],
+    "output": "022a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a"
+  },
+  "WriteBid": {
+    "input": [
+      {
+        "type": "Transform",
+        "value": {
+          "WriteBid": {
+            "validator_public_key": "01197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d61",
+            "bonding_purse": "uref-0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a-007",
+            "staked_amount": "50000000000",
+            "delegation_rate": 100,
+            "vesting_schedule": {
+              "initial_release_timestamp_millis": 18446744073709551615,
+              "locked_amounts": null
+            },
+            "delegators": {},
+            "inactive": false
+          }
+        }
+      }
+    ],
+    "output": "0901197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d610a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a070500743ba40b6401ffffffffffffffff000000000000"
+  },
+  "WriteCLValue": {
+    "input": [
+      {
+        "type": "Transform",
+        "value": {
+          "WriteCLValue": {
+            "cl_type": "String",
+            "bytes": "0d00000048656c6c6f2c20776f726c6421",
+            "parsed": "Hello, world!"
+          }
+        }
+      }
+    ],
+    "output": "01110000000d00000048656c6c6f2c20776f726c64210a"
+  },
+  "WriteContract": {
+    "input": [
+      {
+        "type": "Transform",
+        "value": "WriteContract"
+      }
+    ],
+    "output": "04"
+  },
+  "WriteContractPackage": {
+    "input": [
+      {
+        "type": "Transform",
+        "value": "WriteContractPackage"
+      }
+    ],
+    "output": "05"
+  },
+  "WriteContractWasm": {
+    "input": [
+      {
+        "type": "Transform",
+        "value": "WriteContractWasm"
+      }
+    ],
+    "output": "03"
+  },
+  "WriteDeployInfo": {
+    "input": [
+      {
+        "type": "Transform",
+        "value": {
+          "WriteDeployInfo": {
+            "deploy_hash": "3737373737373737373737373737373737373737373737373737373737373737",
+            "transfers": [
+              "transfer-0101010101010101010101010101010101010101010101010101010101010101",
+              "transfer-0202020202020202020202020202020202020202020202020202020202020202"
+            ],
+            "from": "account-hash-6464646464646464646464646464646464646464646464646464646464646464",
+            "source": "uref-0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a-007",
+            "gas": "2500000000"
+          }
+        }
+      }
+    ],
+    "output": "063737373737373737373737373737373737373737373737373737373737373737020000000101010101010101010101010101010101010101010101010101010101010101020202020202020202020202020202020202020202020202020202020202020264646464646464646464646464646464646464646464646464646464646464640a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a070400f90295"
+  },
+  "WriteEraInfo": {
+    "input": [
+      {
+        "type": "Transform",
+        "value": {
+          "WriteEraInfo": {
+            "seigniorage_allocations": [
+              {
+                "Validator": {
+                  "validator_public_key": "01197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d61",
+                  "amount": "1000000000"
+                }
+              },
+              {
+                "Delegator": {
+                  "delegator_public_key": "0202bb58b5feca505c74edc000d8282fc556e51a1024fc8e7d7e56c6f887c5c8d5f2",
+                  "validator_public_key": "01197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d61",
+                  "amount": "1000000000"
+                }
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "output": "08020000000001197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d610400ca9a3b010202bb58b5feca505c74edc000d8282fc556e51a1024fc8e7d7e56c6f887c5c8d5f201197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d610400ca9a3b"
+  },
+  "WriteTransfer": {
+    "input": [
+      {
+        "type": "Transform",
+        "value": {
+          "WriteTransfer": {
+            "deploy_hash": "2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c",
+            "from": "account-hash-6464646464646464646464646464646464646464646464646464646464646464",
+            "to": "account-hash-6565656565656565656565656565656565656565656565656565656565656565",
+            "source": "uref-0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a-002",
+            "target": "uref-0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b-002",
+            "amount": "15000000000",
+            "gas": "2500000000",
+            "id": 1
+          }
+        }
+      }
+    ],
+    "output": "072c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c64646464646464646464646464646464646464646464646464646464646464640165656565656565656565656565656565656565656565656565656565656565650a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a020b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b020500d6117e030400f90295010100000000000000"
+  },
+  "WriteWithdraw": {
+    "input": [
+      {
+        "type": "Transform",
+        "value": {
+          "WriteWithdraw": [
+            {
+              "bonding_purse": "uref-0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a-001",
+              "validator_public_key": "01197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d61",
+              "unbonder_public_key": "01197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d61",
+              "era_of_creation": 41,
+              "amount": "60000000000"
+            },
+            {
+              "bonding_purse": "uref-0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b-001",
+              "validator_public_key": "01197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d61",
+              "unbonder_public_key": "0202bb58b5feca505c74edc000d8282fc556e51a1024fc8e7d7e56c6f887c5c8d5f2",
+              "era_of_creation": 42,
+              "amount": "50000000000"
+            }
+          ]
+        }
+      }
+    ],
+    "output": "0a020000000a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0101197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d6101197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d61290000000000000005005847f80d0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0101197f6b23e16c8532c6abc838facd5ea789be0c76b2920334039bfa8b3d368d610202bb58b5feca505c74edc000d8282fc556e51a1024fc8e7d7e56c6f887c5c8d5f22a000000000000000500743ba40b"
+  }
+}

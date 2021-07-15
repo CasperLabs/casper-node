@@ -11,6 +11,7 @@ members = [
     "smart_contracts/contract",
     "smart_contracts/contracts/[!.]*/*",
     "types",
+    "utils/validation",
     "utils/global-state-update-gen",
 ]
 
@@ -24,6 +25,7 @@ default-members = [
     "node",
     "smart_contracts/contract",
     "types",
+    "utils/validation",
     "utils/global-state-update-gen",
 ]
 
