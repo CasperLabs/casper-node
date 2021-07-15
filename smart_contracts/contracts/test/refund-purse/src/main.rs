@@ -1,6 +1,10 @@
 #![no_std]
 #![no_main]
 
+extern crate alloc;
+
+use alloc::string::String;
+
 use casper_contract::{
     contract_api::{account, runtime, system},
     unwrap_or_revert::UnwrapOrRevert,
@@ -20,6 +24,8 @@ const ARG_PAYMENT_AMOUNT: &str = "payment_amount";
 const SET_REFUND_PURSE: &str = "set_refund_purse";
 const GET_REFUND_PURSE: &str = "get_refund_purse";
 const GET_PAYMENT_PURSE: &str = "get_payment_purse";
+const ARG_PURSE_NAME_1: &str = "purse_name_1";
+const ARG_PURSE_NAME_2: &str = "purse_name_2";
 
 fn set_refund_purse(contract_hash: ContractHash, p: &URef) {
     runtime::call_contract(
@@ -49,7 +55,13 @@ fn submit_payment(handle_payment: ContractHash, amount: U512) {
 pub extern "C" fn call() {
     let handle_payment = system::get_handle_payment();
 
-    let refund_purse = system::create_purse();
+    let refund_purse_name_1: String = runtime::get_named_arg(ARG_PURSE_NAME_1);
+    let refund_purse_name_2: String = runtime::get_named_arg(ARG_PURSE_NAME_2);
+
+    let refund_purse_1 = runtime::get_key(&refund_purse_name_1)
+        .unwrap_or_revert()
+        .into_uref()
+        .unwrap_or_revert();
     {
         // get_refund_purse should return None before setting it
         let refund_result = get_refund_purse(handle_payment);
@@ -58,10 +70,10 @@ pub extern "C" fn call() {
         }
 
         // it should return Some(x) after calling set_refund_purse(x)
-        set_refund_purse(handle_payment, &refund_purse);
+        set_refund_purse(handle_payment, &refund_purse_1);
         let refund_purse = match get_refund_purse(handle_payment) {
             None => runtime::revert(ApiError::User(Error::NotFound as u16)),
-            Some(x) if x.addr() == refund_purse.addr() => x,
+            Some(x) if x.addr() == refund_purse_1.addr() => x,
             Some(_) => runtime::revert(ApiError::User(Error::Invalid as u16)),
         };
 
@@ -71,12 +83,15 @@ pub extern "C" fn call() {
         }
     }
     {
-        let refund_purse = system::create_purse();
+        let refund_purse_2 = runtime::get_key(&refund_purse_name_2)
+            .unwrap_or_revert()
+            .into_uref()
+            .unwrap_or_revert();
         // get_refund_purse should return correct value after setting a second time
-        set_refund_purse(handle_payment, &refund_purse);
+        set_refund_purse(handle_payment, &refund_purse_2);
         match get_refund_purse(handle_payment) {
             None => runtime::revert(ApiError::User(Error::NotFound as u16)),
-            Some(uref) if uref.addr() == refund_purse.addr() => (),
+            Some(uref) if uref.addr() == refund_purse_2.addr() => (),
             Some(_) => runtime::revert(ApiError::User(Error::Invalid as u16)),
         }
 

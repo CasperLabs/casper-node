@@ -148,7 +148,7 @@ call_contract = { cost = 4_500, arguments = [0, 0, 0, 0, 0, 420, 0] }
 call_versioned_contract = { cost = 200, arguments = [0, 0, 0, 0, 0, 0, 0, 0, 0] }
 create_contract_package_at_hash = { cost = 200, arguments = [0, 0] }
 create_contract_user_group = { cost = 200, arguments = [0, 0, 0, 0, 0, 0, 0, 0] }
-create_purse = { cost = 170_000, arguments = [0, 0] }
+create_purse = { cost = 2_500_000_000, arguments = [0, 0] }
 disable_contract_version = { cost = 200, arguments = [0, 0, 0, 0] }
 get_balance = { cost = 3_800, arguments = [0, 0, 0] }
 get_blocktime = { cost = 330, arguments = [0] }
@@ -202,9 +202,9 @@ read_era_id = 10_000
 activate_bid = 10_000
 
 [system_costs.mint_costs]
-mint = 10_000
+mint = 2_500_000_000
 reduce_total_supply = 10_000
-create = 10_000
+create = 2_500_000_000
 balance = 10_000
 transfer = 10_000
 read_base_round_reward = 10_000

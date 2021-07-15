@@ -125,9 +125,9 @@ read_era_id = 10_000
 activate_bid = 10_000
 
 [system_costs.mint_costs]
-mint = 10_000
+mint = 2_500_000_000
 reduce_total_supply = 10_000
-create = 10_000
+create = 2_500_000_000
 balance = 10_000
 transfer = 10_000
 read_base_round_reward = 10_000
