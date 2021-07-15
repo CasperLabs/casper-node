@@ -1,11 +1,17 @@
 use std::collections::BTreeMap;
 
+use num_derive::{FromPrimitive, ToPrimitive};
+use num_traits::FromPrimitive;
+
 use casper_types::{
-    bytesrepr::{self, FromBytes, ToBytes},
-    ContractHash, HashAddr,
+    bytesrepr::{self, FromBytes, StructReader, StructWriter, ToBytes},
+    ContractHash, ProtocolVersion,
 };
 
-use crate::shared::{system_config::SystemConfig, wasm_config::WasmConfig};
+use crate::{
+    legacy::protocol_data::{LegacyProtocolData, LEGACY_PROTOCOL_DATA_VERSION},
+    shared::{system_config::SystemConfig, wasm_config::WasmConfig},
+};
 
 const DEFAULT_ADDRESS: [u8; 32] = [0; 32];
 pub const DEFAULT_WASMLESS_TRANSFER_COST: u32 = 10_000;
@@ -147,50 +153,107 @@ impl ProtocolData {
     }
 }
 
+#[derive(FromPrimitive, ToPrimitive)]
+enum ProtocolDataKeys {
+    WasmConfig = 100,
+    SystemConfig = 101,
+    Mint = 102,
+    HandlePayment = 103,
+    StandardPayment = 104,
+    Auction = 105,
+}
+
 impl ToBytes for ProtocolData {
     fn to_bytes(&self) -> Result<Vec<u8>, bytesrepr::Error> {
-        let mut ret = bytesrepr::unchecked_allocate_buffer(self);
+        let mut writer = StructWriter::new();
 
-        ret.append(&mut self.wasm_config.to_bytes()?);
-        ret.append(&mut self.system_config.to_bytes()?);
-        ret.append(&mut self.mint.to_bytes()?);
-        ret.append(&mut self.handle_payment.to_bytes()?);
-        ret.append(&mut self.standard_payment.to_bytes()?);
-        ret.append(&mut self.auction.to_bytes()?);
+        writer.write_pair(ProtocolDataKeys::WasmConfig, self.wasm_config)?;
+        writer.write_pair(ProtocolDataKeys::SystemConfig, self.system_config)?;
+        writer.write_pair(ProtocolDataKeys::Mint, self.mint)?;
+        writer.write_pair(ProtocolDataKeys::HandlePayment, self.handle_payment)?;
+        writer.write_pair(ProtocolDataKeys::StandardPayment, self.standard_payment)?;
+        writer.write_pair(ProtocolDataKeys::Auction, self.auction)?;
 
-        Ok(ret)
+        writer.finish()
     }
 
     fn serialized_length(&self) -> usize {
-        self.wasm_config.serialized_length()
-            + self.system_config.serialized_length()
-            + self.mint.serialized_length()
-            + self.handle_payment.serialized_length()
-            + self.standard_payment.serialized_length()
-            + self.auction.serialized_length()
+        bytesrepr::serialized_struct_fields_length(&[
+            self.wasm_config.serialized_length(),
+            self.system_config.serialized_length(),
+            self.mint.serialized_length(),
+            self.handle_payment.serialized_length(),
+            self.standard_payment.serialized_length(),
+            self.auction.serialized_length(),
+        ])
     }
 }
 
 impl FromBytes for ProtocolData {
     fn from_bytes(bytes: &[u8]) -> Result<(Self, &[u8]), bytesrepr::Error> {
-        let (wasm_config, rem) = WasmConfig::from_bytes(bytes)?;
-        let (system_config, rem) = FromBytes::from_bytes(rem)?;
-        let (mint, rem) = HashAddr::from_bytes(rem)?;
-        let (handle_payment, rem) = HashAddr::from_bytes(rem)?;
-        let (standard_payment, rem) = HashAddr::from_bytes(rem)?;
-        let (auction, rem) = HashAddr::from_bytes(rem)?;
+        let mut reader = StructReader::new(bytes);
 
-        Ok((
-            ProtocolData {
-                wasm_config,
-                mint: mint.into(),
-                handle_payment: handle_payment.into(),
-                standard_payment: standard_payment.into(),
-                auction: auction.into(),
-                system_config,
-            },
-            rem,
-        ))
+        let mut protocol_data = ProtocolData::default();
+
+        while let Some(key) = reader.read_key()? {
+            match ProtocolDataKeys::from_u64(key) {
+                Some(ProtocolDataKeys::WasmConfig) => {
+                    protocol_data.wasm_config = reader.read_value()?
+                }
+                Some(ProtocolDataKeys::SystemConfig) => {
+                    protocol_data.system_config = reader.read_value()?
+                }
+                Some(ProtocolDataKeys::Mint) => protocol_data.mint = reader.read_value()?,
+                Some(ProtocolDataKeys::HandlePayment) => {
+                    protocol_data.handle_payment = reader.read_value()?
+                }
+                Some(ProtocolDataKeys::StandardPayment) => {
+                    protocol_data.standard_payment = reader.read_value()?
+                }
+                Some(ProtocolDataKeys::Auction) => protocol_data.auction = reader.read_value()?,
+                None => reader.skip_value()?,
+            }
+        }
+
+        Ok((protocol_data, reader.finish()))
+    }
+}
+
+/// Deserializes [`ProtocolData`] with respect to different data formats present across protocol
+/// versions.
+pub(crate) fn get_versioned_protocol_data(
+    protocol_version: &ProtocolVersion,
+    bytes: Vec<u8>,
+) -> Result<ProtocolData, bytesrepr::Error> {
+    if protocol_version <= &LEGACY_PROTOCOL_DATA_VERSION {
+        // Old, legacy data format
+        match bytesrepr::deserialize::<LegacyProtocolData>(bytes.clone()) {
+            Ok(legacy_protocol_data) => {
+                // Legacy protocol data deserialized with a success (i.e. existing network)
+                Ok(ProtocolData::from(legacy_protocol_data))
+            }
+            Err(bytesrepr::Error::LeftOverBytes) => {
+                // Any LeftOverBytes error during deserialization of legacy protocol data indicates
+                // that the newer format is longer than the legacy one.
+                // This can happen when (for example) new network starts with a genesis using a
+                // lower than or equal to LEGACY_PROTOCOL_DATA_VERSION.
+                //
+                // Genesis process intentionally serializes new format
+                // instead of legacy, where deserialization considers old format based on version
+                // just for migration purposes.
+                //
+                // This choice is made intentionally to enforce new serialization format by default.
+                // The benefit of this approach is that a) we don't need to maintain
+                // legacy serialization code and also b) special conversions between
+                // LegacyProtocolData and ProtocolData should it change over time and c) we should
+                // be able to remove legacy code on next major release
+                bytesrepr::deserialize(bytes)
+            }
+            Err(error) => Err(error),
+        }
+    } else {
+        // Future-proof data format
+        bytesrepr::deserialize(bytes)
     }
 }
 

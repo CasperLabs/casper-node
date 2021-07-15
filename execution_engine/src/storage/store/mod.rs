@@ -14,6 +14,20 @@ pub trait Store<K, V> {
 
     fn handle(&self) -> Self::Handle;
 
+    fn deserialize_value(&self, _key: &K, bytes: Vec<u8>) -> Result<V, bytesrepr::Error>
+    where
+        V: FromBytes,
+    {
+        bytesrepr::deserialize(bytes)
+    }
+
+    fn serialize_value(&self, _key: &K, value: &V) -> Result<Vec<u8>, bytesrepr::Error>
+    where
+        V: ToBytes,
+    {
+        value.to_bytes()
+    }
+
     fn get<T>(&self, txn: &T, key: &K) -> Result<Option<V>, Self::Error>
     where
         T: Readable<Handle = Self::Handle>,
@@ -25,7 +39,7 @@ pub trait Store<K, V> {
         match txn.read(handle, &key.to_bytes()?)? {
             None => Ok(None),
             Some(value_bytes) => {
-                let value = bytesrepr::deserialize(value_bytes.into())?;
+                let value = self.deserialize_value(key, value_bytes.into())?;
                 Ok(Some(value))
             }
         }
@@ -39,7 +53,9 @@ pub trait Store<K, V> {
         Self::Error: From<T::Error>,
     {
         let handle = self.handle();
-        txn.write(handle, &key.to_bytes()?, &value.to_bytes()?)
+        let key_bytes = key.to_bytes()?;
+        let value_bytes = self.serialize_value(key, value)?;
+        txn.write(handle, &key_bytes, &value_bytes)
             .map_err(Into::into)
     }
 }

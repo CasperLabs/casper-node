@@ -1,9 +1,9 @@
-use casper_types::ProtocolVersion;
+use casper_types::{bytesrepr, ProtocolVersion};
 use lmdb::{Database, DatabaseFlags};
 
 use crate::storage::{
     error,
-    protocol_data::ProtocolData,
+    protocol_data::{self, ProtocolData},
     protocol_data_store::{self, ProtocolDataStore},
     store::Store,
     transaction_source::lmdb::LmdbEnvironment,
@@ -48,6 +48,14 @@ impl Store<ProtocolVersion, ProtocolData> for LmdbProtocolDataStore {
 
     fn handle(&self) -> Self::Handle {
         self.db
+    }
+
+    fn deserialize_value(
+        &self,
+        protocol_version: &ProtocolVersion,
+        bytes: Vec<u8>,
+    ) -> Result<ProtocolData, bytesrepr::Error> {
+        protocol_data::get_versioned_protocol_data(protocol_version, bytes)
     }
 }
 

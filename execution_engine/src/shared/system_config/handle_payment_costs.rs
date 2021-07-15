@@ -1,12 +1,23 @@
-use casper_types::bytesrepr::{self, FromBytes, ToBytes};
 use datasize::DataSize;
+use num_derive::{FromPrimitive, ToPrimitive};
+use num_traits::FromPrimitive;
 use rand::{distributions::Standard, prelude::*, Rng};
 use serde::{Deserialize, Serialize};
+
+use casper_types::bytesrepr::{self, FromBytes, StructReader, StructWriter, ToBytes};
 
 pub const DEFAULT_GET_PAYMENT_PURSE_COST: u32 = 10_000;
 pub const DEFAULT_SET_REFUND_PURSE_COST: u32 = 10_000;
 pub const DEFAULT_GET_REFUND_PURSE_COST: u32 = 10_000;
 pub const DEFAULT_FINALIZE_PAYMENT_COST: u32 = 10_000;
+
+#[derive(FromPrimitive, ToPrimitive)]
+enum HandlePaymentCostsKeys {
+    GetPaymentPurse = 100,
+    SetRefundPurse = 101,
+    GetRefundPurse = 102,
+    FinalizePayment = 103,
+}
 
 /// Description of costs of calling handle payment entrypoints.
 #[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Debug, DataSize)]
@@ -30,40 +41,63 @@ impl Default for HandlePaymentCosts {
 
 impl ToBytes for HandlePaymentCosts {
     fn to_bytes(&self) -> Result<Vec<u8>, casper_types::bytesrepr::Error> {
-        let mut ret = bytesrepr::unchecked_allocate_buffer(self);
+        let mut writer = StructWriter::new();
 
-        ret.append(&mut self.get_payment_purse.to_bytes()?);
-        ret.append(&mut self.set_refund_purse.to_bytes()?);
-        ret.append(&mut self.get_refund_purse.to_bytes()?);
-        ret.append(&mut self.finalize_payment.to_bytes()?);
+        writer.write_pair(
+            HandlePaymentCostsKeys::GetPaymentPurse,
+            self.get_payment_purse,
+        )?;
+        writer.write_pair(
+            HandlePaymentCostsKeys::SetRefundPurse,
+            self.set_refund_purse,
+        )?;
+        writer.write_pair(
+            HandlePaymentCostsKeys::GetRefundPurse,
+            self.get_refund_purse,
+        )?;
+        writer.write_pair(
+            HandlePaymentCostsKeys::FinalizePayment,
+            self.finalize_payment,
+        )?;
 
-        Ok(ret)
+        writer.finish()
     }
 
     fn serialized_length(&self) -> usize {
-        self.get_payment_purse.serialized_length()
-            + self.set_refund_purse.serialized_length()
-            + self.get_refund_purse.serialized_length()
-            + self.finalize_payment.serialized_length()
+        bytesrepr::serialized_struct_fields_length(&[
+            self.get_payment_purse.serialized_length(),
+            self.set_refund_purse.serialized_length(),
+            self.get_refund_purse.serialized_length(),
+            self.finalize_payment.serialized_length(),
+        ])
     }
 }
 
 impl FromBytes for HandlePaymentCosts {
     fn from_bytes(bytes: &[u8]) -> Result<(Self, &[u8]), casper_types::bytesrepr::Error> {
-        let (get_payment_purse, rem) = FromBytes::from_bytes(bytes)?;
-        let (set_refund_purse, rem) = FromBytes::from_bytes(rem)?;
-        let (get_refund_purse, rem) = FromBytes::from_bytes(rem)?;
-        let (finalize_payment, rem) = FromBytes::from_bytes(rem)?;
+        let mut handle_payment_costs = HandlePaymentCosts::default();
 
-        Ok((
-            Self {
-                get_payment_purse,
-                set_refund_purse,
-                get_refund_purse,
-                finalize_payment,
-            },
-            rem,
-        ))
+        let mut reader = StructReader::new(bytes);
+
+        while let Some(key) = reader.read_key()? {
+            match HandlePaymentCostsKeys::from_u64(key) {
+                Some(HandlePaymentCostsKeys::GetPaymentPurse) => {
+                    handle_payment_costs.get_payment_purse = reader.read_value()?
+                }
+                Some(HandlePaymentCostsKeys::SetRefundPurse) => {
+                    handle_payment_costs.set_refund_purse = reader.read_value()?
+                }
+                Some(HandlePaymentCostsKeys::GetRefundPurse) => {
+                    handle_payment_costs.get_refund_purse = reader.read_value()?
+                }
+                Some(HandlePaymentCostsKeys::FinalizePayment) => {
+                    handle_payment_costs.finalize_payment = reader.read_value()?
+                }
+                None => reader.skip_value()?,
+            }
+        }
+
+        Ok((handle_payment_costs, reader.finish()))
     }
 }
 

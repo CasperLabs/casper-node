@@ -1,11 +1,15 @@
 use std::collections::BTreeMap;
 
 use datasize::DataSize;
+use num_derive::{FromPrimitive, ToPrimitive};
+use num_traits::FromPrimitive;
 use pwasm_utils::rules::{InstructionType, Metering, Set};
 use rand::{distributions::Standard, prelude::*, Rng};
 use serde::{Deserialize, Serialize};
 
-use casper_types::bytesrepr::{self, FromBytes, ToBytes, U32_SERIALIZED_LENGTH};
+use casper_types::bytesrepr::{
+    self, FromBytes, StructReader, StructWriter, ToBytes, U32_SERIALIZED_LENGTH,
+};
 
 pub const DEFAULT_BIT_COST: u32 = 300;
 pub const DEFAULT_ADD_COST: u32 = 210;
@@ -27,6 +31,27 @@ pub const DEFAULT_REGULAR_COST: u32 = 210;
 
 const NUM_FIELDS: usize = 17;
 pub const OPCODE_COSTS_SERIALIZED_LENGTH: usize = NUM_FIELDS * U32_SERIALIZED_LENGTH;
+
+#[derive(ToPrimitive, FromPrimitive)]
+enum OpcodeCostsKey {
+    Bit = 100,
+    Add = 101,
+    Mul = 102,
+    Div = 103,
+    Load = 104,
+    Store = 105,
+    Const = 106,
+    Local = 107,
+    Global = 108,
+    ControlFlow = 109,
+    IntegerComparison = 110,
+    Conversion = 111,
+    Unreachable = 112,
+    Nop = 113,
+    CurrentMemory = 114,
+    GrowMemory = 115,
+    Regular = 116,
+}
 
 // Taken (partially) from parity-ethereum
 #[derive(Copy, Clone, PartialEq, Eq, Serialize, Deserialize, Debug, DataSize)]
@@ -168,73 +193,94 @@ impl Distribution<OpcodeCosts> for Standard {
 
 impl ToBytes for OpcodeCosts {
     fn to_bytes(&self) -> Result<Vec<u8>, bytesrepr::Error> {
-        let mut ret = bytesrepr::unchecked_allocate_buffer(self);
+        let mut writer = StructWriter::new();
 
-        ret.append(&mut self.bit.to_bytes()?);
-        ret.append(&mut self.add.to_bytes()?);
-        ret.append(&mut self.mul.to_bytes()?);
-        ret.append(&mut self.div.to_bytes()?);
-        ret.append(&mut self.load.to_bytes()?);
-        ret.append(&mut self.store.to_bytes()?);
-        ret.append(&mut self.op_const.to_bytes()?);
-        ret.append(&mut self.local.to_bytes()?);
-        ret.append(&mut self.global.to_bytes()?);
-        ret.append(&mut self.control_flow.to_bytes()?);
-        ret.append(&mut self.integer_comparison.to_bytes()?);
-        ret.append(&mut self.conversion.to_bytes()?);
-        ret.append(&mut self.unreachable.to_bytes()?);
-        ret.append(&mut self.nop.to_bytes()?);
-        ret.append(&mut self.current_memory.to_bytes()?);
-        ret.append(&mut self.grow_memory.to_bytes()?);
-        ret.append(&mut self.regular.to_bytes()?);
+        writer.write_pair(OpcodeCostsKey::Bit, self.bit)?;
+        writer.write_pair(OpcodeCostsKey::Add, self.add)?;
+        writer.write_pair(OpcodeCostsKey::Mul, self.mul)?;
+        writer.write_pair(OpcodeCostsKey::Div, self.div)?;
+        writer.write_pair(OpcodeCostsKey::Load, self.load)?;
+        writer.write_pair(OpcodeCostsKey::Store, self.store)?;
+        writer.write_pair(OpcodeCostsKey::Const, self.op_const)?;
+        writer.write_pair(OpcodeCostsKey::Local, self.local)?;
+        writer.write_pair(OpcodeCostsKey::Global, self.global)?;
+        writer.write_pair(OpcodeCostsKey::ControlFlow, self.control_flow)?;
+        writer.write_pair(OpcodeCostsKey::IntegerComparison, self.integer_comparison)?;
+        writer.write_pair(OpcodeCostsKey::Conversion, self.conversion)?;
+        writer.write_pair(OpcodeCostsKey::Unreachable, self.unreachable)?;
+        writer.write_pair(OpcodeCostsKey::Nop, self.nop)?;
+        writer.write_pair(OpcodeCostsKey::CurrentMemory, self.current_memory)?;
+        writer.write_pair(OpcodeCostsKey::GrowMemory, self.grow_memory)?;
+        writer.write_pair(OpcodeCostsKey::Regular, self.regular)?;
 
-        Ok(ret)
+        writer.finish()
     }
 
     fn serialized_length(&self) -> usize {
-        OPCODE_COSTS_SERIALIZED_LENGTH
+        bytesrepr::serialized_struct_fields_length(&[
+            self.bit.serialized_length(),
+            self.add.serialized_length(),
+            self.mul.serialized_length(),
+            self.div.serialized_length(),
+            self.load.serialized_length(),
+            self.store.serialized_length(),
+            self.op_const.serialized_length(),
+            self.local.serialized_length(),
+            self.global.serialized_length(),
+            self.control_flow.serialized_length(),
+            self.integer_comparison.serialized_length(),
+            self.conversion.serialized_length(),
+            self.unreachable.serialized_length(),
+            self.nop.serialized_length(),
+            self.current_memory.serialized_length(),
+            self.grow_memory.serialized_length(),
+            self.regular.serialized_length(),
+        ])
     }
 }
 
 impl FromBytes for OpcodeCosts {
     fn from_bytes(bytes: &[u8]) -> Result<(Self, &[u8]), bytesrepr::Error> {
-        let (bit, bytes): (_, &[u8]) = FromBytes::from_bytes(bytes)?;
-        let (add, bytes): (_, &[u8]) = FromBytes::from_bytes(bytes)?;
-        let (mul, bytes): (_, &[u8]) = FromBytes::from_bytes(bytes)?;
-        let (div, bytes): (_, &[u8]) = FromBytes::from_bytes(bytes)?;
-        let (load, bytes): (_, &[u8]) = FromBytes::from_bytes(bytes)?;
-        let (store, bytes): (_, &[u8]) = FromBytes::from_bytes(bytes)?;
-        let (const_, bytes): (_, &[u8]) = FromBytes::from_bytes(bytes)?;
-        let (local, bytes): (_, &[u8]) = FromBytes::from_bytes(bytes)?;
-        let (global, bytes): (_, &[u8]) = FromBytes::from_bytes(bytes)?;
-        let (control_flow, bytes): (_, &[u8]) = FromBytes::from_bytes(bytes)?;
-        let (integer_comparison, bytes): (_, &[u8]) = FromBytes::from_bytes(bytes)?;
-        let (conversion, bytes): (_, &[u8]) = FromBytes::from_bytes(bytes)?;
-        let (unreachable, bytes): (_, &[u8]) = FromBytes::from_bytes(bytes)?;
-        let (nop, bytes): (_, &[u8]) = FromBytes::from_bytes(bytes)?;
-        let (current_memory, bytes): (_, &[u8]) = FromBytes::from_bytes(bytes)?;
-        let (grow_memory, bytes): (_, &[u8]) = FromBytes::from_bytes(bytes)?;
-        let (regular, bytes): (_, &[u8]) = FromBytes::from_bytes(bytes)?;
-        let opcode_costs = OpcodeCosts {
-            bit,
-            add,
-            mul,
-            div,
-            load,
-            store,
-            op_const: const_,
-            local,
-            global,
-            control_flow,
-            integer_comparison,
-            conversion,
-            unreachable,
-            nop,
-            current_memory,
-            grow_memory,
-            regular,
-        };
-        Ok((opcode_costs, bytes))
+        let mut opcode_costs = OpcodeCosts::default();
+
+        let mut reader = StructReader::new(bytes);
+
+        while let Some(key) = reader.read_key()? {
+            match OpcodeCostsKey::from_u64(key) {
+                Some(OpcodeCostsKey::Bit) => opcode_costs.bit = reader.read_value()?,
+                Some(OpcodeCostsKey::Add) => opcode_costs.add = reader.read_value()?,
+                Some(OpcodeCostsKey::Mul) => opcode_costs.mul = reader.read_value()?,
+                Some(OpcodeCostsKey::Div) => opcode_costs.div = reader.read_value()?,
+                Some(OpcodeCostsKey::Load) => opcode_costs.load = reader.read_value()?,
+                Some(OpcodeCostsKey::Store) => opcode_costs.store = reader.read_value()?,
+                Some(OpcodeCostsKey::Const) => opcode_costs.op_const = reader.read_value()?,
+                Some(OpcodeCostsKey::Local) => opcode_costs.local = reader.read_value()?,
+                Some(OpcodeCostsKey::Global) => opcode_costs.global = reader.read_value()?,
+                Some(OpcodeCostsKey::ControlFlow) => {
+                    opcode_costs.control_flow = reader.read_value()?
+                }
+                Some(OpcodeCostsKey::IntegerComparison) => {
+                    opcode_costs.integer_comparison = reader.read_value()?
+                }
+                Some(OpcodeCostsKey::Conversion) => {
+                    opcode_costs.conversion = reader.read_value()?
+                }
+                Some(OpcodeCostsKey::Unreachable) => {
+                    opcode_costs.unreachable = reader.read_value()?
+                }
+                Some(OpcodeCostsKey::Nop) => opcode_costs.nop = reader.read_value()?,
+                Some(OpcodeCostsKey::CurrentMemory) => {
+                    opcode_costs.current_memory = reader.read_value()?
+                }
+                Some(OpcodeCostsKey::GrowMemory) => {
+                    opcode_costs.grow_memory = reader.read_value()?
+                }
+                Some(OpcodeCostsKey::Regular) => opcode_costs.regular = reader.read_value()?,
+                None => reader.skip_value()?,
+            }
+        }
+
+        Ok((opcode_costs, reader.finish()))
     }
 }
 

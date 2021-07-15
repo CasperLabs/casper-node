@@ -1,9 +1,17 @@
-use casper_types::bytesrepr::{self, FromBytes, ToBytes};
 use datasize::DataSize;
+use num_derive::{FromPrimitive, ToPrimitive};
+use num_traits::FromPrimitive;
 use rand::{distributions::Standard, prelude::*, Rng};
 use serde::{Deserialize, Serialize};
 
+use casper_types::bytesrepr::{self, FromBytes, StructReader, StructWriter, ToBytes};
+
 pub const DEFAULT_PAY_COST: u32 = 10_000;
+
+#[derive(FromPrimitive, ToPrimitive)]
+enum StandardPaymentCostsKeys {
+    Pay = 100,
+}
 
 /// Description of costs of calling standard payment entrypoints.
 #[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Debug, DataSize)]
@@ -21,20 +29,34 @@ impl Default for StandardPaymentCosts {
 
 impl ToBytes for StandardPaymentCosts {
     fn to_bytes(&self) -> Result<Vec<u8>, casper_types::bytesrepr::Error> {
-        let mut ret = bytesrepr::unchecked_allocate_buffer(self);
-        ret.append(&mut self.pay.to_bytes()?);
-        Ok(ret)
+        let mut writer = StructWriter::new();
+
+        writer.write_pair(StandardPaymentCostsKeys::Pay, self.pay)?;
+
+        writer.finish()
     }
 
     fn serialized_length(&self) -> usize {
-        self.pay.serialized_length()
+        bytesrepr::serialized_struct_fields_length(&[self.pay.serialized_length()])
     }
 }
 
 impl FromBytes for StandardPaymentCosts {
     fn from_bytes(bytes: &[u8]) -> Result<(Self, &[u8]), casper_types::bytesrepr::Error> {
-        let (pay, rem) = FromBytes::from_bytes(bytes)?;
-        Ok((Self { pay }, rem))
+        let mut standard_payment_costs = StandardPaymentCosts::default();
+
+        let mut reader = StructReader::new(bytes);
+
+        while let Some(key) = reader.read_key()? {
+            match StandardPaymentCostsKeys::from_u64(key) {
+                Some(StandardPaymentCostsKeys::Pay) => {
+                    standard_payment_costs.pay = reader.read_value()?
+                }
+                None => reader.skip_value()?,
+            }
+        }
+
+        Ok((standard_payment_costs, reader.finish()))
     }
 }
 

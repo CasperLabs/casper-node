@@ -1,15 +1,22 @@
 use datasize::DataSize;
+use num_derive::{FromPrimitive, ToPrimitive};
+use num_traits::FromPrimitive;
 use rand::{distributions::Standard, prelude::*, Rng};
 use serde::{Deserialize, Serialize};
 
 use casper_types::{
-    bytesrepr::{self, FromBytes, ToBytes},
+    bytesrepr::{self, FromBytes, StructReader, StructWriter, ToBytes},
     U512,
 };
 
 use super::gas::Gas;
 
 pub const DEFAULT_GAS_PER_BYTE_COST: u32 = 625_000;
+
+#[derive(FromPrimitive, ToPrimitive)]
+enum StorageCostsKeys {
+    GasPerByte = 100,
+}
 
 #[derive(Copy, Clone, PartialEq, Eq, Serialize, Deserialize, Debug, DataSize)]
 pub struct StorageCosts {
@@ -51,23 +58,31 @@ impl Distribution<StorageCosts> for Standard {
 
 impl ToBytes for StorageCosts {
     fn to_bytes(&self) -> Result<Vec<u8>, bytesrepr::Error> {
-        let mut ret = bytesrepr::unchecked_allocate_buffer(self);
-
-        ret.append(&mut self.gas_per_byte.to_bytes()?);
-
-        Ok(ret)
+        let mut writer = StructWriter::new();
+        writer.write_pair(StorageCostsKeys::GasPerByte, self.gas_per_byte)?;
+        writer.finish()
     }
 
     fn serialized_length(&self) -> usize {
-        self.gas_per_byte.serialized_length()
+        bytesrepr::serialized_struct_fields_length(&[self.gas_per_byte.serialized_length()])
     }
 }
 
 impl FromBytes for StorageCosts {
     fn from_bytes(bytes: &[u8]) -> Result<(Self, &[u8]), bytesrepr::Error> {
-        let (gas_per_byte, rem) = FromBytes::from_bytes(bytes)?;
+        let mut reader = StructReader::new(bytes);
 
-        Ok((StorageCosts { gas_per_byte }, rem))
+        let mut storage_costs = StorageCosts::default();
+
+        while let Some(key) = reader.read_key()? {
+            match StorageCostsKeys::from_u64(key) {
+                Some(StorageCostsKeys::GasPerByte) => {
+                    storage_costs.gas_per_byte = reader.read_value()?
+                }
+                None => reader.skip_value()?,
+            }
+        }
+        Ok((storage_costs, reader.finish()))
     }
 }
 
@@ -79,6 +94,11 @@ pub mod tests {
 
     const SMALL_WEIGHT: usize = 123456789;
     const LARGE_WEIGHT: usize = usize::max_value();
+
+    #[test]
+    fn roundtrip_test() {
+        bytesrepr::test_serialization_roundtrip(&StorageCosts::default());
+    }
 
     #[test]
     fn should_calculate_gas_cost() {

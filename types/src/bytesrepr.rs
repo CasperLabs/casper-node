@@ -13,11 +13,13 @@ use alloc::{
 };
 #[cfg(debug_assertions)]
 use core::any;
-use core::{mem, ptr::NonNull};
+use core::{marker::PhantomData, mem, ptr::NonNull};
 
 use num_integer::Integer;
 use num_rational::Ratio;
+use num_traits::ToPrimitive;
 use serde::{Deserialize, Serialize};
+
 #[cfg(feature = "std")]
 use thiserror::Error;
 
@@ -1148,9 +1150,165 @@ where
     assert!(*t == deserialized)
 }
 
+/// A convenient writer object that deals with serializing structs. Binary representation is very
+/// similar to a serialized [`BTreeMap<u64, Vec<u8>>`], or a vector of 2-element tuple, but with
+/// extra type safety.
+pub struct StructWriter<K> {
+    buf: Vec<u8>,
+    items: u32,
+    marker: PhantomData<K>,
+}
+
+impl<K> Default for StructWriter<K> {
+    fn default() -> Self {
+        Self {
+            buf: Vec::new(),
+            items: 0,
+            marker: PhantomData,
+        }
+    }
+}
+
+impl<K: ToPrimitive> StructWriter<K> {
+    /// Creates new writer for a struct
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Writes a pair of a key, and a value
+    pub fn write_pair<V>(&mut self, key: K, value: V) -> Result<(), Error>
+    where
+        V: ToBytes,
+    {
+        let key_serializable = key.to_u64().unwrap();
+        let value_serializable = value.to_bytes()?;
+        // Serializes a key as a number with fixed length bytes
+        self.buf.append(&mut key_serializable.to_bytes()?);
+        // Serializes a value as a length-prefixed byte array so deserializer can skip unknown
+        // fields while iterating.
+        self.buf
+            .append(&mut Bytes::from(value_serializable).to_bytes()?);
+        self.items += 1;
+        Ok(())
+    }
+
+    /// Returns serialized structure
+    pub fn finish(mut self) -> Result<Vec<u8>, Error> {
+        let mut length_prefix = self.items.to_bytes()?;
+
+        let mut result = Vec::with_capacity(length_prefix.len() + self.buf.len());
+        result.append(&mut length_prefix);
+        result.append(&mut self.buf);
+
+        Ok(result)
+    }
+}
+
+/// Calculates size of a serialized struct with given fields sizes
+pub fn serialized_struct_fields_length(fields: &[usize]) -> usize {
+    let attributes: usize = fields
+        .iter()
+        // key serialied length+ u32 length prefix + length of serialized field
+        .map(|&field_length| U64_SERIALIZED_LENGTH + U32_SERIALIZED_LENGTH + field_length)
+        .sum();
+    U32_SERIALIZED_LENGTH + attributes
+}
+
+/// Reader of a serialized structs with [`StructWriter`]
+/// NOTE: This reader implementation does not try to be re-entrant. It means that once
+/// [`StructReader::read_key`] or [`StructReader::read_value`] errors, then you should not attempt
+/// to read from the same reader again.
+pub struct StructReader<'a> {
+    buf: &'a [u8],
+    length_prefix: Option<u32>,
+}
+
+impl<'a> StructReader<'a> {
+    /// Creates new reader with given byte stream
+    pub fn new(buf: &'a [u8]) -> Self {
+        Self {
+            buf,
+            length_prefix: None,
+        }
+    }
+
+    /// Reads a length prefix if not read already
+    fn read_length_prefix(&mut self) -> Result<u32, Error> {
+        match self.length_prefix {
+            Some(value) => Ok(value),
+            None => {
+                let (length_prefix, rem) = FromBytes::from_bytes(self.buf)?;
+                self.buf = rem;
+                self.length_prefix = Some(length_prefix);
+                Ok(length_prefix)
+            }
+        }
+    }
+
+    /// Reads next key in a struct
+    pub fn read_key(&mut self) -> Result<Option<u64>, Error> {
+        let length_prefix = self.read_length_prefix()?;
+        if length_prefix == 0 {
+            return Ok(None);
+        }
+
+        let (key_value, rem): (u64, _) = FromBytes::from_bytes(self.buf)?;
+        self.buf = rem;
+        Ok(Some(key_value))
+    }
+
+    /// Reads next value from a struct
+    pub fn read_value<V>(&mut self) -> Result<V, Error>
+    where
+        V: FromBytes,
+    {
+        let value_bytes = self.read_value_raw()?;
+        // Deserialize the data contained
+        let v: V = deserialize(value_bytes)?;
+        Ok(v)
+    }
+
+    /// Reads next element by trying to deserialize it, and moves the internal buffer forward once
+    /// it succeed
+    fn advance<T>(&mut self) -> Result<T, Error>
+    where
+        T: FromBytes,
+    {
+        let (value, rem) = FromBytes::from_bytes(self.buf)?;
+        self.buf = rem;
+        Ok(value)
+    }
+
+    fn read_value_raw(&mut self) -> Result<Vec<u8>, Error> {
+        let length_prefix = self.length_prefix.ok_or(Error::Formatting)?;
+        if length_prefix == 0 {
+            return Err(Error::Formatting);
+        }
+        let value_bytes: Bytes = self.advance()?;
+        self.length_prefix = Some(length_prefix - 1);
+        Ok(value_bytes.into())
+    }
+
+    /// Skips next value. Useful in case where the key is unknown, or is deprecated/removed.
+    pub fn skip_value(&mut self) -> Result<(), Error> {
+        let _bytes = self.read_value_raw()?;
+        Ok(())
+    }
+
+    /// Returns remaining buffer
+    pub fn finish(self) -> &'a [u8] {
+        self.buf
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use crate::U512;
+    use alloc::{str::FromStr, string::ToString};
+    use num_derive::{FromPrimitive, ToPrimitive};
+    use num_traits::FromPrimitive;
 
     #[test]
     fn should_not_serialize_zero_denominator() {
@@ -1171,6 +1329,144 @@ mod tests {
     fn should_fail_to_serialize_slice_of_u8() {
         let bytes = b"0123456789".to_vec();
         bytes.to_bytes().unwrap();
+    }
+
+    #[derive(ToPrimitive, FromPrimitive, Eq, PartialEq, Ord, PartialOrd)]
+    enum Key {
+        Attr1 = 100,
+        Attr2,
+        Attr3,
+        Attr4,
+        Attr5,
+    }
+
+    struct FooV1 {
+        attr1: u64,
+        attr2: Vec<String>,
+        attr3: String,
+        attr4: u64,
+    }
+
+    impl ToBytes for FooV1 {
+        fn to_bytes(&self) -> Result<Vec<u8>, Error> {
+            let mut writer = StructWriter::new();
+            writer.write_pair(Key::Attr1, self.attr1)?;
+            writer.write_pair(Key::Attr2, self.attr2.clone())?;
+            writer.write_pair(Key::Attr3, self.attr3.clone())?;
+            writer.write_pair(Key::Attr4, self.attr4)?;
+            writer.finish()
+        }
+
+        fn serialized_length(&self) -> usize {
+            todo!()
+        }
+    }
+
+    struct FooV2 {
+        attr1: u64,
+        attr2: Vec<u32>, // was Vec<String>
+        attr3: String,
+        attr4: String,
+        new_field: U512,
+        unknown_fields: BTreeMap<u64, Vec<u8>>,
+    }
+
+    impl Default for FooV2 {
+        fn default() -> Self {
+            FooV2 {
+                attr1: 0,
+                attr2: Vec::new(),
+                attr3: String::new(),
+                attr4: String::new(),
+                new_field: U512::MAX,
+                unknown_fields: BTreeMap::new(),
+            }
+        }
+    }
+
+    impl ToBytes for FooV2 {
+        fn to_bytes(&self) -> Result<Vec<u8>, Error> {
+            let mut writer = StructWriter::new();
+            writer.write_pair(Key::Attr1, self.attr1)?;
+            writer.write_pair(Key::Attr2, self.attr2.clone())?;
+            writer.write_pair(Key::Attr3, self.attr3.clone())?;
+            writer.write_pair(Key::Attr4, self.attr4.clone())?;
+            writer.finish()
+        }
+
+        fn serialized_length(&self) -> usize {
+            todo!()
+        }
+    }
+
+    impl FromBytes for FooV2 {
+        fn from_bytes(bytes: &[u8]) -> Result<(Self, &[u8]), Error> {
+            let mut reader = StructReader::new(bytes);
+
+            let mut obj = FooV2::default();
+
+            while let Some(key) = reader.read_key()? {
+                match Key::from_u64(key) {
+                    Some(Key::Attr1) => {
+                        obj.attr1 = reader.read_value()?;
+                    }
+                    Some(Key::Attr2) => {
+                        let old_attr2: Vec<String> = reader.read_value()?;
+                        obj.attr2 = old_attr2
+                            .into_iter()
+                            .filter_map(|value| u32::from_str(&value).ok())
+                            .collect();
+                    }
+                    Some(Key::Attr3) => {
+                        obj.attr3 = reader.read_value()?;
+                    }
+                    Some(Key::Attr4) => {
+                        let old_attr4: u64 = reader.read_value()?;
+                        obj.attr4 = old_attr4.to_string();
+                    }
+                    None | Some(_) => {
+                        obj.unknown_fields.insert(key, reader.read_value_raw()?);
+                    }
+                }
+            }
+
+            Ok((obj, reader.finish()))
+        }
+    }
+
+    #[test]
+    fn struct_serializer() {
+        let foo_v1 = FooV1 {
+            attr1: 123456789u64,
+            attr2: vec!["50".to_string(), "100".to_string(), "150".to_string()],
+            attr3: "Hello, world!".to_string(),
+            attr4: 987654321u64,
+        };
+
+        let foo_v1_bytes = foo_v1.to_bytes().unwrap();
+
+        let foo_v2: FooV2 = deserialize(foo_v1_bytes).unwrap();
+
+        assert_eq!(foo_v1.attr1, foo_v2.attr1);
+        assert_eq!(
+            foo_v1.attr2,
+            foo_v2
+                .attr2
+                .iter()
+                .map(|value| value.to_string())
+                .collect::<Vec<String>>()
+        );
+        assert_eq!(foo_v1.attr3, foo_v2.attr3);
+        assert_eq!(foo_v1.attr4.to_string(), foo_v2.attr4);
+        assert_eq!(foo_v2.new_field, U512::MAX);
+    }
+
+    #[test]
+    fn should_not_panic_when_used_incorrectly() {
+        // 1 element in struct, first elements' key is 0, there should be a value but there is none
+        let buffer_1 = (0u32, 0u64).to_bytes().unwrap();
+        let mut reader_1 = StructReader::new(&buffer_1);
+        assert_eq!(reader_1.read_value::<()>().unwrap_err(), Error::Formatting);
     }
 }
 

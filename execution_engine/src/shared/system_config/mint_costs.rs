@@ -1,7 +1,10 @@
-use casper_types::bytesrepr::{self, FromBytes, ToBytes};
 use datasize::DataSize;
+use num_derive::{FromPrimitive, ToPrimitive};
+use num_traits::FromPrimitive;
 use rand::{distributions::Standard, prelude::*, Rng};
 use serde::{Deserialize, Serialize};
+
+use casper_types::bytesrepr::{self, FromBytes, StructReader, StructWriter, ToBytes};
 
 pub const DEFAULT_MINT_COST: u32 = 10_000;
 pub const DEFAULT_REDUCE_TOTAL_SUPPLY_COST: u32 = 10_000;
@@ -9,6 +12,16 @@ pub const DEFAULT_CREATE_COST: u32 = 10_000;
 pub const DEFAULT_BALANCE_COST: u32 = 10_000;
 pub const DEFAULT_TRANSFER_COST: u32 = 10_000;
 pub const DEFAULT_READ_BASE_ROUND_REWARD_COST: u32 = 10_000;
+
+#[derive(FromPrimitive, ToPrimitive)]
+enum MintCostsKeys {
+    Mint = 100,
+    ReduceTotalSupply = 101,
+    Create = 102,
+    Balance = 103,
+    Transfer = 104,
+    ReadBaseRoundReward = 105,
+}
 
 /// Description of costs of calling mint entrypoints.
 #[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Debug, DataSize)]
@@ -36,48 +49,56 @@ impl Default for MintCosts {
 
 impl ToBytes for MintCosts {
     fn to_bytes(&self) -> Result<Vec<u8>, casper_types::bytesrepr::Error> {
-        let mut ret = bytesrepr::unchecked_allocate_buffer(self);
+        let mut writer = StructWriter::new();
 
-        ret.append(&mut self.mint.to_bytes()?);
-        ret.append(&mut self.reduce_total_supply.to_bytes()?);
-        ret.append(&mut self.create.to_bytes()?);
-        ret.append(&mut self.balance.to_bytes()?);
-        ret.append(&mut self.transfer.to_bytes()?);
-        ret.append(&mut self.read_base_round_reward.to_bytes()?);
+        writer.write_pair(MintCostsKeys::Mint, self.mint)?;
+        writer.write_pair(MintCostsKeys::ReduceTotalSupply, self.reduce_total_supply)?;
+        writer.write_pair(MintCostsKeys::Create, self.create)?;
+        writer.write_pair(MintCostsKeys::Balance, self.balance)?;
+        writer.write_pair(MintCostsKeys::Transfer, self.transfer)?;
+        writer.write_pair(
+            MintCostsKeys::ReadBaseRoundReward,
+            self.read_base_round_reward,
+        )?;
 
-        Ok(ret)
+        writer.finish()
     }
 
     fn serialized_length(&self) -> usize {
-        self.mint.serialized_length()
-            + self.reduce_total_supply.serialized_length()
-            + self.create.serialized_length()
-            + self.balance.serialized_length()
-            + self.transfer.serialized_length()
-            + self.read_base_round_reward.serialized_length()
+        bytesrepr::serialized_struct_fields_length(&[
+            self.mint.serialized_length(),
+            self.reduce_total_supply.serialized_length(),
+            self.create.serialized_length(),
+            self.balance.serialized_length(),
+            self.transfer.serialized_length(),
+            self.read_base_round_reward.serialized_length(),
+        ])
     }
 }
 
 impl FromBytes for MintCosts {
     fn from_bytes(bytes: &[u8]) -> Result<(Self, &[u8]), casper_types::bytesrepr::Error> {
-        let (mint, rem) = FromBytes::from_bytes(bytes)?;
-        let (reduce_total_supply, rem) = FromBytes::from_bytes(rem)?;
-        let (create, rem) = FromBytes::from_bytes(rem)?;
-        let (balance, rem) = FromBytes::from_bytes(rem)?;
-        let (transfer, rem) = FromBytes::from_bytes(rem)?;
-        let (read_base_round_reward, rem) = FromBytes::from_bytes(rem)?;
+        let mut mint_costs = MintCosts::default();
 
-        Ok((
-            Self {
-                mint,
-                reduce_total_supply,
-                create,
-                balance,
-                transfer,
-                read_base_round_reward,
-            },
-            rem,
-        ))
+        let mut reader = StructReader::new(bytes);
+
+        while let Some(key) = reader.read_key()? {
+            match MintCostsKeys::from_u64(key) {
+                Some(MintCostsKeys::Mint) => mint_costs.mint = reader.read_value()?,
+                Some(MintCostsKeys::ReduceTotalSupply) => {
+                    mint_costs.reduce_total_supply = reader.read_value()?
+                }
+                Some(MintCostsKeys::Create) => mint_costs.create = reader.read_value()?,
+                Some(MintCostsKeys::Balance) => mint_costs.balance = reader.read_value()?,
+                Some(MintCostsKeys::Transfer) => mint_costs.transfer = reader.read_value()?,
+                Some(MintCostsKeys::ReadBaseRoundReward) => {
+                    mint_costs.read_base_round_reward = reader.read_value()?
+                }
+                None => reader.skip_value()?,
+            }
+        }
+
+        Ok((mint_costs, reader.finish()))
     }
 }
 

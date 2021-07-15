@@ -15,5 +15,6 @@
 
 pub mod config;
 pub mod core;
+pub mod legacy;
 pub mod shared;
 pub mod storage;

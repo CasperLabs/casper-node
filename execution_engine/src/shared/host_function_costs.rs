@@ -1,15 +1,17 @@
+use std::convert::{TryFrom, TryInto};
+
 use datasize::DataSize;
+use num_derive::{FromPrimitive, ToPrimitive};
+use num_traits::FromPrimitive;
 use rand::{distributions::Standard, prelude::Distribution, Rng};
 use serde::{Deserialize, Serialize};
 
-use casper_types::bytesrepr::{self, FromBytes, ToBytes, U32_SERIALIZED_LENGTH};
+use casper_types::bytesrepr::{self, FromBytes, StructReader, StructWriter, ToBytes};
 
 use super::gas::Gas;
 
 /// Representation of argument's cost.
 pub type Cost = u32;
-
-const COST_SERIALIZED_LENGTH: usize = U32_SERIALIZED_LENGTH;
 
 /// An identifier that represents an unused argument.
 const NOT_USED: Cost = 0;
@@ -129,6 +131,10 @@ where
         self.arguments.as_ref()
     }
 
+    pub fn take_arguments(self) -> T {
+        self.arguments
+    }
+
     /// Calculate gas cost for a host function
     pub fn calculate_gas_cost(&self, weights: T) -> Gas {
         let mut gas = Gas::new(self.cost.into());
@@ -160,32 +166,77 @@ where
     fn to_bytes(&self) -> Result<Vec<u8>, bytesrepr::Error> {
         let mut ret = bytesrepr::unchecked_allocate_buffer(self);
         ret.append(&mut self.cost.to_bytes()?);
-        for value in self.arguments.as_ref().iter() {
-            ret.append(&mut value.to_bytes()?);
-        }
+
+        let length_prefixed_arguments = self.arguments.as_ref().to_vec();
+        ret.append(&mut length_prefixed_arguments.to_bytes()?);
         Ok(ret)
     }
 
     fn serialized_length(&self) -> usize {
-        self.cost.serialized_length() + (COST_SERIALIZED_LENGTH * self.arguments.as_ref().len())
+        self.cost.serialized_length() + self.arguments.as_ref().to_vec().serialized_length()
     }
 }
 
 impl<T> FromBytes for HostFunction<T>
 where
-    T: Default + AsMut<[Cost]>,
+    for<'a> T: TryFrom<&'a [Cost]>,
 {
     fn from_bytes(bytes: &[u8]) -> Result<(Self, &[u8]), bytesrepr::Error> {
-        let (cost, mut bytes) = FromBytes::from_bytes(bytes)?;
-        let mut arguments = T::default();
-        let arguments_mut = arguments.as_mut();
-        for ith_argument in arguments_mut {
-            let (cost, rem) = FromBytes::from_bytes(bytes)?;
-            *ith_argument = cost;
-            bytes = rem;
-        }
+        let (cost, bytes) = FromBytes::from_bytes(bytes)?;
+
+        let (length_prefixed_arguments, bytes): (Vec<Cost>, _) = FromBytes::from_bytes(bytes)?;
+        let arguments: T = length_prefixed_arguments
+            .as_slice()
+            .try_into()
+            .map_err(|_| bytesrepr::Error::Formatting)?;
         Ok((Self { cost, arguments }, bytes))
     }
+}
+
+#[derive(FromPrimitive, ToPrimitive)]
+enum HostFunctionCostsKeys {
+    ReadValue = 100,
+    DictionaryGet = 101,
+    Write = 102,
+    DictionaryPut = 103,
+    Add = 104,
+    NewURef = 105,
+    LoadNamedKeys = 106,
+    Ret = 107,
+    GetKey = 108,
+    HasKey = 109,
+    PutKey = 110,
+    RemoveKey = 111,
+    Revert = 112,
+    IsValidURef = 113,
+    AddAssociatedKey = 114,
+    RemoveAssociatedKey = 115,
+    UpdateAssociatedKey = 116,
+    SetActionThreshold = 117,
+    GetCaller = 118,
+    GetBlocktime = 119,
+    CreatePurse = 120,
+    TransferToAccount = 121,
+    TransferFromPurseToAccount = 122,
+    TransferFromPurseToPurse = 123,
+    GetBalance = 124,
+    GetPhase = 125,
+    GetSystemContract = 126,
+    GetMainPurse = 127,
+    ReadHostBuffer = 128,
+    CreateContractPackageAtHash = 129,
+    CreateContractUserGroup = 130,
+    AddContractVersion = 131,
+    DisableContractVersion = 132,
+    CallContract = 133,
+    CallVersionedContract = 134,
+    GetNamedArgSize = 135,
+    GetNamedArg = 136,
+    RemoveContractUserGroup = 137,
+    ProvisionContractUserGroupUref = 138,
+    RemoveContractUserGroupUrefs = 139,
+    Print = 140,
+    Blake2b = 141,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Serialize, Deserialize, Debug, DataSize)]
@@ -357,189 +408,292 @@ impl Default for HostFunctionCosts {
 
 impl ToBytes for HostFunctionCosts {
     fn to_bytes(&self) -> Result<Vec<u8>, bytesrepr::Error> {
-        let mut ret = bytesrepr::unchecked_allocate_buffer(self);
-        ret.append(&mut self.read_value.to_bytes()?);
-        ret.append(&mut self.dictionary_get.to_bytes()?);
-        ret.append(&mut self.write.to_bytes()?);
-        ret.append(&mut self.dictionary_put.to_bytes()?);
-        ret.append(&mut self.add.to_bytes()?);
-        ret.append(&mut self.new_uref.to_bytes()?);
-        ret.append(&mut self.load_named_keys.to_bytes()?);
-        ret.append(&mut self.ret.to_bytes()?);
-        ret.append(&mut self.get_key.to_bytes()?);
-        ret.append(&mut self.has_key.to_bytes()?);
-        ret.append(&mut self.put_key.to_bytes()?);
-        ret.append(&mut self.remove_key.to_bytes()?);
-        ret.append(&mut self.revert.to_bytes()?);
-        ret.append(&mut self.is_valid_uref.to_bytes()?);
-        ret.append(&mut self.add_associated_key.to_bytes()?);
-        ret.append(&mut self.remove_associated_key.to_bytes()?);
-        ret.append(&mut self.update_associated_key.to_bytes()?);
-        ret.append(&mut self.set_action_threshold.to_bytes()?);
-        ret.append(&mut self.get_caller.to_bytes()?);
-        ret.append(&mut self.get_blocktime.to_bytes()?);
-        ret.append(&mut self.create_purse.to_bytes()?);
-        ret.append(&mut self.transfer_to_account.to_bytes()?);
-        ret.append(&mut self.transfer_from_purse_to_account.to_bytes()?);
-        ret.append(&mut self.transfer_from_purse_to_purse.to_bytes()?);
-        ret.append(&mut self.get_balance.to_bytes()?);
-        ret.append(&mut self.get_phase.to_bytes()?);
-        ret.append(&mut self.get_system_contract.to_bytes()?);
-        ret.append(&mut self.get_main_purse.to_bytes()?);
-        ret.append(&mut self.read_host_buffer.to_bytes()?);
-        ret.append(&mut self.create_contract_package_at_hash.to_bytes()?);
-        ret.append(&mut self.create_contract_user_group.to_bytes()?);
-        ret.append(&mut self.add_contract_version.to_bytes()?);
-        ret.append(&mut self.disable_contract_version.to_bytes()?);
-        ret.append(&mut self.call_contract.to_bytes()?);
-        ret.append(&mut self.call_versioned_contract.to_bytes()?);
-        ret.append(&mut self.get_named_arg_size.to_bytes()?);
-        ret.append(&mut self.get_named_arg.to_bytes()?);
-        ret.append(&mut self.remove_contract_user_group.to_bytes()?);
-        ret.append(&mut self.provision_contract_user_group_uref.to_bytes()?);
-        ret.append(&mut self.remove_contract_user_group_urefs.to_bytes()?);
-        ret.append(&mut self.print.to_bytes()?);
-        ret.append(&mut self.blake2b.to_bytes()?);
-        Ok(ret)
+        let mut writer = StructWriter::new();
+
+        writer.write_pair(HostFunctionCostsKeys::ReadValue, self.read_value)?;
+        writer.write_pair(HostFunctionCostsKeys::DictionaryGet, self.dictionary_get)?;
+        writer.write_pair(HostFunctionCostsKeys::Write, self.write)?;
+        writer.write_pair(HostFunctionCostsKeys::DictionaryPut, self.dictionary_put)?;
+        writer.write_pair(HostFunctionCostsKeys::Add, self.add)?;
+        writer.write_pair(HostFunctionCostsKeys::NewURef, self.new_uref)?;
+        writer.write_pair(HostFunctionCostsKeys::LoadNamedKeys, self.load_named_keys)?;
+        writer.write_pair(HostFunctionCostsKeys::Ret, self.ret)?;
+        writer.write_pair(HostFunctionCostsKeys::GetKey, self.get_key)?;
+        writer.write_pair(HostFunctionCostsKeys::HasKey, self.has_key)?;
+        writer.write_pair(HostFunctionCostsKeys::PutKey, self.put_key)?;
+        writer.write_pair(HostFunctionCostsKeys::RemoveKey, self.remove_key)?;
+        writer.write_pair(HostFunctionCostsKeys::Revert, self.revert)?;
+        writer.write_pair(HostFunctionCostsKeys::IsValidURef, self.is_valid_uref)?;
+        writer.write_pair(
+            HostFunctionCostsKeys::AddAssociatedKey,
+            self.add_associated_key,
+        )?;
+        writer.write_pair(
+            HostFunctionCostsKeys::RemoveAssociatedKey,
+            self.remove_associated_key,
+        )?;
+        writer.write_pair(
+            HostFunctionCostsKeys::UpdateAssociatedKey,
+            self.update_associated_key,
+        )?;
+        writer.write_pair(
+            HostFunctionCostsKeys::SetActionThreshold,
+            self.set_action_threshold,
+        )?;
+        writer.write_pair(HostFunctionCostsKeys::GetCaller, self.get_caller)?;
+        writer.write_pair(HostFunctionCostsKeys::GetBlocktime, self.get_blocktime)?;
+        writer.write_pair(HostFunctionCostsKeys::CreatePurse, self.create_purse)?;
+        writer.write_pair(
+            HostFunctionCostsKeys::TransferToAccount,
+            self.transfer_to_account,
+        )?;
+        writer.write_pair(
+            HostFunctionCostsKeys::TransferFromPurseToAccount,
+            self.transfer_from_purse_to_account,
+        )?;
+        writer.write_pair(
+            HostFunctionCostsKeys::TransferFromPurseToPurse,
+            self.transfer_from_purse_to_purse,
+        )?;
+        writer.write_pair(HostFunctionCostsKeys::GetBalance, self.get_balance)?;
+        writer.write_pair(HostFunctionCostsKeys::GetPhase, self.get_phase)?;
+        writer.write_pair(
+            HostFunctionCostsKeys::GetSystemContract,
+            self.get_system_contract,
+        )?;
+        writer.write_pair(HostFunctionCostsKeys::GetMainPurse, self.get_main_purse)?;
+        writer.write_pair(HostFunctionCostsKeys::ReadHostBuffer, self.read_host_buffer)?;
+        writer.write_pair(
+            HostFunctionCostsKeys::CreateContractPackageAtHash,
+            self.create_contract_package_at_hash,
+        )?;
+        writer.write_pair(
+            HostFunctionCostsKeys::CreateContractUserGroup,
+            self.create_contract_user_group,
+        )?;
+        writer.write_pair(
+            HostFunctionCostsKeys::AddContractVersion,
+            self.add_contract_version,
+        )?;
+        writer.write_pair(
+            HostFunctionCostsKeys::DisableContractVersion,
+            self.disable_contract_version,
+        )?;
+        writer.write_pair(HostFunctionCostsKeys::CallContract, self.call_contract)?;
+        writer.write_pair(
+            HostFunctionCostsKeys::CallVersionedContract,
+            self.call_versioned_contract,
+        )?;
+        writer.write_pair(
+            HostFunctionCostsKeys::GetNamedArgSize,
+            self.get_named_arg_size,
+        )?;
+        writer.write_pair(HostFunctionCostsKeys::GetNamedArg, self.get_named_arg)?;
+        writer.write_pair(
+            HostFunctionCostsKeys::RemoveContractUserGroup,
+            self.remove_contract_user_group,
+        )?;
+        writer.write_pair(
+            HostFunctionCostsKeys::ProvisionContractUserGroupUref,
+            self.provision_contract_user_group_uref,
+        )?;
+        writer.write_pair(
+            HostFunctionCostsKeys::RemoveContractUserGroupUrefs,
+            self.remove_contract_user_group_urefs,
+        )?;
+        writer.write_pair(HostFunctionCostsKeys::Print, self.print)?;
+        writer.write_pair(HostFunctionCostsKeys::Blake2b, self.blake2b)?;
+
+        writer.finish()
     }
 
     fn serialized_length(&self) -> usize {
-        self.read_value.serialized_length()
-            + self.dictionary_get.serialized_length()
-            + self.write.serialized_length()
-            + self.dictionary_put.serialized_length()
-            + self.add.serialized_length()
-            + self.new_uref.serialized_length()
-            + self.load_named_keys.serialized_length()
-            + self.ret.serialized_length()
-            + self.get_key.serialized_length()
-            + self.has_key.serialized_length()
-            + self.put_key.serialized_length()
-            + self.remove_key.serialized_length()
-            + self.revert.serialized_length()
-            + self.is_valid_uref.serialized_length()
-            + self.add_associated_key.serialized_length()
-            + self.remove_associated_key.serialized_length()
-            + self.update_associated_key.serialized_length()
-            + self.set_action_threshold.serialized_length()
-            + self.get_caller.serialized_length()
-            + self.get_blocktime.serialized_length()
-            + self.create_purse.serialized_length()
-            + self.transfer_to_account.serialized_length()
-            + self.transfer_from_purse_to_account.serialized_length()
-            + self.transfer_from_purse_to_purse.serialized_length()
-            + self.get_balance.serialized_length()
-            + self.get_phase.serialized_length()
-            + self.get_system_contract.serialized_length()
-            + self.get_main_purse.serialized_length()
-            + self.read_host_buffer.serialized_length()
-            + self.create_contract_package_at_hash.serialized_length()
-            + self.create_contract_user_group.serialized_length()
-            + self.add_contract_version.serialized_length()
-            + self.disable_contract_version.serialized_length()
-            + self.call_contract.serialized_length()
-            + self.call_versioned_contract.serialized_length()
-            + self.get_named_arg_size.serialized_length()
-            + self.get_named_arg.serialized_length()
-            + self.remove_contract_user_group.serialized_length()
-            + self.provision_contract_user_group_uref.serialized_length()
-            + self.remove_contract_user_group_urefs.serialized_length()
-            + self.print.serialized_length()
-            + self.blake2b.serialized_length()
+        bytesrepr::serialized_struct_fields_length(&[
+            self.read_value.serialized_length(),
+            self.dictionary_get.serialized_length(),
+            self.write.serialized_length(),
+            self.dictionary_put.serialized_length(),
+            self.add.serialized_length(),
+            self.new_uref.serialized_length(),
+            self.load_named_keys.serialized_length(),
+            self.ret.serialized_length(),
+            self.get_key.serialized_length(),
+            self.has_key.serialized_length(),
+            self.put_key.serialized_length(),
+            self.remove_key.serialized_length(),
+            self.revert.serialized_length(),
+            self.is_valid_uref.serialized_length(),
+            self.add_associated_key.serialized_length(),
+            self.remove_associated_key.serialized_length(),
+            self.update_associated_key.serialized_length(),
+            self.set_action_threshold.serialized_length(),
+            self.get_caller.serialized_length(),
+            self.get_blocktime.serialized_length(),
+            self.create_purse.serialized_length(),
+            self.transfer_to_account.serialized_length(),
+            self.transfer_from_purse_to_account.serialized_length(),
+            self.transfer_from_purse_to_purse.serialized_length(),
+            self.get_balance.serialized_length(),
+            self.get_phase.serialized_length(),
+            self.get_system_contract.serialized_length(),
+            self.get_main_purse.serialized_length(),
+            self.read_host_buffer.serialized_length(),
+            self.create_contract_package_at_hash.serialized_length(),
+            self.create_contract_user_group.serialized_length(),
+            self.add_contract_version.serialized_length(),
+            self.disable_contract_version.serialized_length(),
+            self.call_contract.serialized_length(),
+            self.call_versioned_contract.serialized_length(),
+            self.get_named_arg_size.serialized_length(),
+            self.get_named_arg.serialized_length(),
+            self.remove_contract_user_group.serialized_length(),
+            self.provision_contract_user_group_uref.serialized_length(),
+            self.remove_contract_user_group_urefs.serialized_length(),
+            self.print.serialized_length(),
+            self.blake2b.serialized_length(),
+        ])
     }
 }
 
 impl FromBytes for HostFunctionCosts {
     fn from_bytes(bytes: &[u8]) -> Result<(Self, &[u8]), bytesrepr::Error> {
-        let (read_value, rem) = FromBytes::from_bytes(bytes)?;
-        let (dictionary_get, rem) = FromBytes::from_bytes(rem)?;
-        let (write, rem) = FromBytes::from_bytes(rem)?;
-        let (dictionary_put, rem) = FromBytes::from_bytes(rem)?;
-        let (add, rem) = FromBytes::from_bytes(rem)?;
-        let (new_uref, rem) = FromBytes::from_bytes(rem)?;
-        let (load_named_keys, rem) = FromBytes::from_bytes(rem)?;
-        let (ret, rem) = FromBytes::from_bytes(rem)?;
-        let (get_key, rem) = FromBytes::from_bytes(rem)?;
-        let (has_key, rem) = FromBytes::from_bytes(rem)?;
-        let (put_key, rem) = FromBytes::from_bytes(rem)?;
-        let (remove_key, rem) = FromBytes::from_bytes(rem)?;
-        let (revert, rem) = FromBytes::from_bytes(rem)?;
-        let (is_valid_uref, rem) = FromBytes::from_bytes(rem)?;
-        let (add_associated_key, rem) = FromBytes::from_bytes(rem)?;
-        let (remove_associated_key, rem) = FromBytes::from_bytes(rem)?;
-        let (update_associated_key, rem) = FromBytes::from_bytes(rem)?;
-        let (set_action_threshold, rem) = FromBytes::from_bytes(rem)?;
-        let (get_caller, rem) = FromBytes::from_bytes(rem)?;
-        let (get_blocktime, rem) = FromBytes::from_bytes(rem)?;
-        let (create_purse, rem) = FromBytes::from_bytes(rem)?;
-        let (transfer_to_account, rem) = FromBytes::from_bytes(rem)?;
-        let (transfer_from_purse_to_account, rem) = FromBytes::from_bytes(rem)?;
-        let (transfer_from_purse_to_purse, rem) = FromBytes::from_bytes(rem)?;
-        let (get_balance, rem) = FromBytes::from_bytes(rem)?;
-        let (get_phase, rem) = FromBytes::from_bytes(rem)?;
-        let (get_system_contract, rem) = FromBytes::from_bytes(rem)?;
-        let (get_main_purse, rem) = FromBytes::from_bytes(rem)?;
-        let (read_host_buffer, rem) = FromBytes::from_bytes(rem)?;
-        let (create_contract_package_at_hash, rem) = FromBytes::from_bytes(rem)?;
-        let (create_contract_user_group, rem) = FromBytes::from_bytes(rem)?;
-        let (add_contract_version, rem) = FromBytes::from_bytes(rem)?;
-        let (disable_contract_version, rem) = FromBytes::from_bytes(rem)?;
-        let (call_contract, rem) = FromBytes::from_bytes(rem)?;
-        let (call_versioned_contract, rem) = FromBytes::from_bytes(rem)?;
-        let (get_named_arg_size, rem) = FromBytes::from_bytes(rem)?;
-        let (get_named_arg, rem) = FromBytes::from_bytes(rem)?;
-        let (remove_contract_user_group, rem) = FromBytes::from_bytes(rem)?;
-        let (provision_contract_user_group_uref, rem) = FromBytes::from_bytes(rem)?;
-        let (remove_contract_user_group_urefs, rem) = FromBytes::from_bytes(rem)?;
-        let (print, rem) = FromBytes::from_bytes(rem)?;
-        let (blake2b, rem) = FromBytes::from_bytes(rem)?;
-        Ok((
-            HostFunctionCosts {
-                read_value,
-                dictionary_get,
-                write,
-                dictionary_put,
-                add,
-                new_uref,
-                load_named_keys,
-                ret,
-                get_key,
-                has_key,
-                put_key,
-                remove_key,
-                revert,
-                is_valid_uref,
-                add_associated_key,
-                remove_associated_key,
-                update_associated_key,
-                set_action_threshold,
-                get_caller,
-                get_blocktime,
-                create_purse,
-                transfer_to_account,
-                transfer_from_purse_to_account,
-                transfer_from_purse_to_purse,
-                get_balance,
-                get_phase,
-                get_system_contract,
-                get_main_purse,
-                read_host_buffer,
-                create_contract_package_at_hash,
-                create_contract_user_group,
-                add_contract_version,
-                disable_contract_version,
-                call_contract,
-                call_versioned_contract,
-                get_named_arg_size,
-                get_named_arg,
-                remove_contract_user_group,
-                provision_contract_user_group_uref,
-                remove_contract_user_group_urefs,
-                print,
-                blake2b,
-            },
-            rem,
-        ))
+        let mut reader = StructReader::new(bytes);
+
+        let mut host_function_costs = HostFunctionCosts::default();
+
+        while let Some(key) = reader.read_key()? {
+            match HostFunctionCostsKeys::from_u64(key) {
+                Some(HostFunctionCostsKeys::ReadValue) => {
+                    host_function_costs.read_value = reader.read_value()?
+                }
+                Some(HostFunctionCostsKeys::DictionaryGet) => {
+                    host_function_costs.dictionary_get = reader.read_value()?
+                }
+                Some(HostFunctionCostsKeys::Write) => {
+                    host_function_costs.write = reader.read_value()?
+                }
+                Some(HostFunctionCostsKeys::DictionaryPut) => {
+                    host_function_costs.dictionary_put = reader.read_value()?
+                }
+                Some(HostFunctionCostsKeys::Add) => {
+                    host_function_costs.add = reader.read_value()?
+                }
+                Some(HostFunctionCostsKeys::NewURef) => {
+                    host_function_costs.new_uref = reader.read_value()?
+                }
+                Some(HostFunctionCostsKeys::LoadNamedKeys) => {
+                    host_function_costs.load_named_keys = reader.read_value()?
+                }
+                Some(HostFunctionCostsKeys::Ret) => {
+                    host_function_costs.ret = reader.read_value()?
+                }
+                Some(HostFunctionCostsKeys::GetKey) => {
+                    host_function_costs.get_key = reader.read_value()?
+                }
+                Some(HostFunctionCostsKeys::HasKey) => {
+                    host_function_costs.has_key = reader.read_value()?
+                }
+                Some(HostFunctionCostsKeys::PutKey) => {
+                    host_function_costs.put_key = reader.read_value()?
+                }
+                Some(HostFunctionCostsKeys::RemoveKey) => {
+                    host_function_costs.remove_key = reader.read_value()?
+                }
+                Some(HostFunctionCostsKeys::Revert) => {
+                    host_function_costs.revert = reader.read_value()?
+                }
+                Some(HostFunctionCostsKeys::IsValidURef) => {
+                    host_function_costs.is_valid_uref = reader.read_value()?
+                }
+                Some(HostFunctionCostsKeys::AddAssociatedKey) => {
+                    host_function_costs.add_associated_key = reader.read_value()?
+                }
+                Some(HostFunctionCostsKeys::RemoveAssociatedKey) => {
+                    host_function_costs.remove_associated_key = reader.read_value()?
+                }
+                Some(HostFunctionCostsKeys::UpdateAssociatedKey) => {
+                    host_function_costs.update_associated_key = reader.read_value()?
+                }
+                Some(HostFunctionCostsKeys::SetActionThreshold) => {
+                    host_function_costs.set_action_threshold = reader.read_value()?
+                }
+                Some(HostFunctionCostsKeys::GetCaller) => {
+                    host_function_costs.get_caller = reader.read_value()?
+                }
+                Some(HostFunctionCostsKeys::GetBlocktime) => {
+                    host_function_costs.get_blocktime = reader.read_value()?
+                }
+                Some(HostFunctionCostsKeys::CreatePurse) => {
+                    host_function_costs.create_purse = reader.read_value()?
+                }
+                Some(HostFunctionCostsKeys::TransferToAccount) => {
+                    host_function_costs.transfer_to_account = reader.read_value()?
+                }
+                Some(HostFunctionCostsKeys::TransferFromPurseToAccount) => {
+                    host_function_costs.transfer_from_purse_to_account = reader.read_value()?
+                }
+                Some(HostFunctionCostsKeys::TransferFromPurseToPurse) => {
+                    host_function_costs.transfer_from_purse_to_purse = reader.read_value()?
+                }
+                Some(HostFunctionCostsKeys::GetBalance) => {
+                    host_function_costs.get_balance = reader.read_value()?
+                }
+                Some(HostFunctionCostsKeys::GetPhase) => {
+                    host_function_costs.get_phase = reader.read_value()?
+                }
+                Some(HostFunctionCostsKeys::GetSystemContract) => {
+                    host_function_costs.get_system_contract = reader.read_value()?
+                }
+                Some(HostFunctionCostsKeys::GetMainPurse) => {
+                    host_function_costs.get_main_purse = reader.read_value()?
+                }
+                Some(HostFunctionCostsKeys::ReadHostBuffer) => {
+                    host_function_costs.read_host_buffer = reader.read_value()?
+                }
+                Some(HostFunctionCostsKeys::CreateContractPackageAtHash) => {
+                    host_function_costs.create_contract_package_at_hash = reader.read_value()?
+                }
+                Some(HostFunctionCostsKeys::CreateContractUserGroup) => {
+                    host_function_costs.create_contract_user_group = reader.read_value()?
+                }
+                Some(HostFunctionCostsKeys::AddContractVersion) => {
+                    host_function_costs.add_contract_version = reader.read_value()?
+                }
+                Some(HostFunctionCostsKeys::DisableContractVersion) => {
+                    host_function_costs.disable_contract_version = reader.read_value()?
+                }
+                Some(HostFunctionCostsKeys::CallContract) => {
+                    host_function_costs.call_contract = reader.read_value()?
+                }
+                Some(HostFunctionCostsKeys::CallVersionedContract) => {
+                    host_function_costs.call_versioned_contract = reader.read_value()?
+                }
+                Some(HostFunctionCostsKeys::GetNamedArgSize) => {
+                    host_function_costs.get_named_arg_size = reader.read_value()?
+                }
+                Some(HostFunctionCostsKeys::GetNamedArg) => {
+                    host_function_costs.get_named_arg = reader.read_value()?
+                }
+                Some(HostFunctionCostsKeys::RemoveContractUserGroup) => {
+                    host_function_costs.remove_contract_user_group = reader.read_value()?
+                }
+                Some(HostFunctionCostsKeys::ProvisionContractUserGroupUref) => {
+                    host_function_costs.provision_contract_user_group_uref = reader.read_value()?
+                }
+                Some(HostFunctionCostsKeys::RemoveContractUserGroupUrefs) => {
+                    host_function_costs.remove_contract_user_group_urefs = reader.read_value()?
+                }
+                Some(HostFunctionCostsKeys::Print) => {
+                    host_function_costs.print = reader.read_value()?
+                }
+                Some(HostFunctionCostsKeys::Blake2b) => {
+                    host_function_costs.blake2b = reader.read_value()?
+                }
+                None => reader.skip_value()?,
+            }
+        }
+
+        Ok((host_function_costs, reader.finish()))
     }
 }
 

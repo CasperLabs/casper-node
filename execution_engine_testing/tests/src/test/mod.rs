@@ -9,6 +9,7 @@ mod get_balance;
 mod groups;
 mod host_function_costs;
 mod manage_groups;
+mod protocol_data_upgrade;
 mod regression;
 mod step;
 mod storage_costs;
