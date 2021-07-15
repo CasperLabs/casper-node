@@ -54,10 +54,8 @@ pub type UnbondingPurses = BTreeMap<AccountHash, Vec<UnbondingPurse>>;
 pub trait Auction:
     StorageProvider + SystemProvider + RuntimeProvider + MintProvider + AccountProvider + Sized
 {
-    /// Returns era_validators.
-    ///
-    /// Publicly accessible, but intended for periodic use by the Handle Payment contract to update
-    /// its own internal data structures recording current and past winners.
+    /// Returns active validators and auction winners for a number of future eras determined by the
+    /// configured auction_delay.
     fn get_era_validators(&mut self) -> Result<EraValidators, Error> {
         let snapshot = detail::get_seigniorage_recipients_snapshot(self)?;
         let era_validators = snapshot
@@ -90,9 +88,18 @@ pub trait Auction:
         Ok(seigniorage_recipients)
     }
 
-    /// For a non-founder validator, this adds, or modifies, an entry in the `bids` collection and
-    /// calls `bond` in the Mint contract to create (or top off) a bid purse. It also adjusts the
-    /// delegation rate.
+    /// This entry point adds or modifies an entry in the `Key::Bid` section of the global state and
+    /// creates (or tops off) a bid purse. Post genesis, any new call on this entry point causes a
+    /// non-founding validator in the system to exist.
+    ///
+    /// The logic works for both founding and non-founding validators, making it possible to adjust
+    /// their delegation rate and increase their stakes.
+    ///
+    /// A validator with its bid inactive due to slashing can activate his bid again by increasing
+    /// its stake.
+    ///
+    /// Validators cannot create a bid with 0 amount, and the delegation rate can't exceed
+    /// [`DELEGATION_RATE_DENOMINATOR`].
     fn add_bid(
         &mut self,
         public_key: PublicKey,
@@ -152,14 +159,17 @@ pub trait Auction:
         Ok(updated_amount)
     }
 
-    /// For a non-founder validator, implements essentially the same logic as add_bid, but reducing
-    /// the number of tokens and calling unbond in lieu of bond.
+    /// For a non-founder validator, this entry point implements essentially the same logic as
+    /// `add_bid` but reducing the number of tokens staked in the bid.
     ///
-    /// For a founding validator, this function first checks whether they are released, and fails
-    /// if they are not.
+    /// For a founding validator, this function first checks whether they are released and fails if
+    /// they are not.
     ///
-    /// The function returns a the new amount of motes remaining in the bid. If the target bid
-    /// does not exist, the function call returns an error.
+    /// All the delegators that bid their tokens on a particular validator are automatically
+    /// unbonded with their total staked amount.
+    ///
+    /// The function returns the new amount of motes remaining in the bid. If the target bid does
+    /// not exist, the function call returns an error.
     fn withdraw_bid(&mut self, public_key: PublicKey, amount: U512) -> Result<U512, Error> {
         let provided_account_hash = AccountHash::from_public_key(&public_key, |x| self.blake2b(x));
         match self.get_immediate_caller() {
@@ -215,11 +225,12 @@ pub trait Auction:
         Ok(updated_stake)
     }
 
-    /// Adds a new delegator to delegators, or tops off a current one. If the target validator is
-    /// not in founders, the function call returns an error and does nothing.
+    /// Adds a new delegator to delegators or tops its current stake. If the target validator is
+    /// missing, the function call returns an error and does nothing.
     ///
-    /// The function calls bond in the Mint contract to transfer motes to the validator's purse and
-    /// returns a tuple of that purse and the amount of motes contained in it after the transfer.
+    /// The function transfers motes from the source purse to the delegator's bonding purse.
+    ///    
+    /// This entry point returns the number of tokens currently delegated to a given validator.
     fn delegate(
         &mut self,
         delegator_public_key: PublicKey,
@@ -286,12 +297,12 @@ pub trait Auction:
         Ok(new_delegation_amount)
     }
 
-    /// Removes an amount of motes (or the entry altogether, if the remaining amount is 0) from
-    /// the entry in delegators and calls unbond in the Mint contract to create a new unbonding
-    /// purse.
+    /// Removes specified amount of motes (or the value from the collection altogether, if the
+    /// remaining amount is 0) from the entry in delegators map for given validator and creates a
+    /// new unbonding request to the queue.
     ///
-    /// The arguments are the delegator’s key, the validator key and quantity of motes and
-    /// returns a tuple of the unbonding purse along with the remaining bid amount.
+    /// The arguments are the delegator's key, the validator's key, and the remaining stake and
+    /// return the remaining bid amount.
     fn undelegate(
         &mut self,
         delegator_public_key: PublicKey,
