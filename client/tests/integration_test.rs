@@ -119,34 +119,24 @@ impl MockServerHandle {
         }
     }
 
-    fn get_balance(&self, state_root_hash: &str, purse_uref: &str) -> Result<(), ErrWrapper> {
-        casper_client::get_balance("1", &self.url(), 0, state_root_hash, purse_uref)
-            .map(|_| ())
-            .map_err(ErrWrapper)
+    fn get_balance(&self, state_root_hash: &str, purse_uref: &str) -> Result<(), Error> {
+        casper_client::get_balance("1", &self.url(), 0, state_root_hash, purse_uref).map(|_| ())
     }
 
-    fn get_deploy(&self, deploy_hash: &str) -> Result<(), ErrWrapper> {
-        casper_client::get_deploy("1", &self.url(), 0, deploy_hash)
-            .map(|_| ())
-            .map_err(ErrWrapper)
+    fn get_deploy(&self, deploy_hash: &str) -> Result<(), Error> {
+        casper_client::get_deploy("1", &self.url(), 0, deploy_hash).map(|_| ())
     }
 
-    fn get_state_root_hash(&self, maybe_block_id: &str) -> Result<(), ErrWrapper> {
-        casper_client::get_state_root_hash("1", &self.url(), 0, maybe_block_id)
-            .map(|_| ())
-            .map_err(ErrWrapper)
+    fn get_state_root_hash(&self, maybe_block_id: &str) -> Result<(), Error> {
+        casper_client::get_state_root_hash("1", &self.url(), 0, maybe_block_id).map(|_| ())
     }
 
-    fn get_block(&self, maybe_block_id: &str) -> Result<(), ErrWrapper> {
-        casper_client::get_block("1", &self.url(), 0, maybe_block_id)
-            .map(|_| ())
-            .map_err(ErrWrapper)
+    fn get_block(&self, maybe_block_id: &str) -> Result<(), Error> {
+        casper_client::get_block("1", &self.url(), 0, maybe_block_id).map(|_| ())
     }
 
-    fn get_item(&self, state_root_hash: &str, key: &str, path: &str) -> Result<(), ErrWrapper> {
-        casper_client::get_item("1", &self.url(), 0, state_root_hash, key, path)
-            .map(|_| ())
-            .map_err(ErrWrapper)
+    fn get_item(&self, state_root_hash: &str, key: &str, path: &str) -> Result<(), Error> {
+        casper_client::get_item("1", &self.url(), 0, state_root_hash, key, path).map(|_| ())
     }
 
     fn transfer(
@@ -155,7 +145,7 @@ impl MockServerHandle {
         maybe_target_account: &str,
         deploy_params: DeployStrParams,
         payment_params: PaymentStrParams,
-    ) -> Result<(), ErrWrapper> {
+    ) -> Result<(), Error> {
         casper_client::transfer(
             "1",
             &self.url(),
@@ -167,7 +157,6 @@ impl MockServerHandle {
             payment_params,
         )
         .map(|_| ())
-        .map_err(ErrWrapper)
     }
 
     fn put_deploy(
@@ -175,7 +164,7 @@ impl MockServerHandle {
         deploy_params: DeployStrParams,
         session_params: SessionStrParams,
         payment_params: PaymentStrParams,
-    ) -> Result<(), ErrWrapper> {
+    ) -> Result<(), Error> {
         casper_client::put_deploy(
             "1",
             &self.url(),
@@ -185,19 +174,14 @@ impl MockServerHandle {
             payment_params,
         )
         .map(|_| ())
-        .map_err(ErrWrapper)
     }
 
-    fn send_deploy_file(&self, input_path: &str) -> Result<(), ErrWrapper> {
-        casper_client::send_deploy_file("1", &self.url(), 0, input_path)
-            .map(|_| ())
-            .map_err(ErrWrapper)
+    fn send_deploy_file(&self, input_path: &str) -> Result<(), Error> {
+        casper_client::send_deploy_file("1", &self.url(), 0, input_path).map(|_| ())
     }
 
-    fn get_auction_info(&self, maybe_block_id: &str) -> Result<(), ErrWrapper> {
-        casper_client::get_auction_info("1", &self.url(), 0, maybe_block_id)
-            .map(|_| ())
-            .map_err(ErrWrapper)
+    fn get_auction_info(&self, maybe_block_id: &str) -> Result<(), Error> {
+        casper_client::get_auction_info("1", &self.url(), 0, maybe_block_id).map(|_| ())
     }
 }
 
@@ -209,21 +193,6 @@ impl Drop for MockServerHandle {
             let join = &mut *joiner.lock().await;
             let _ = join.await;
         });
-    }
-}
-
-#[derive(Debug)]
-struct ErrWrapper(pub Error);
-
-impl PartialEq for ErrWrapper {
-    fn eq(&self, other: &ErrWrapper) -> bool {
-        format!("{:?}", self.0) == format!("{:?}", other.0)
-    }
-}
-
-impl From<Error> for ErrWrapper {
-    fn from(error: Error) -> Self {
-        ErrWrapper(error)
     }
 }
 
@@ -283,64 +252,64 @@ mod get_balance {
     #[tokio::test(flavor = "multi_thread")]
     async fn should_succeed_with_valid_arguments() {
         let server_handle = MockServerHandle::spawn::<GetBalanceParams>(GetBalance::METHOD);
-        assert_eq!(
+        assert!(matches!(
             server_handle.get_balance(VALID_STATE_ROOT_HASH, VALID_PURSE_UREF),
             // NOTE: this "success" means that we then fail to validate the response, but that
             // is outside the scope of this test.
             // The MockServerHandle could support a pre-baked response, which should successfully
             // validate
-            Err(
-                Error::InvalidResponse(ValidateResponseError::ValidateResponseFailedToParse).into()
-            )
-        );
+            Err(Error::InvalidResponse(
+                ValidateResponseError::ValidateResponseFailedToParse
+            ))
+        ));
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn should_fail_with_empty_arguments() {
         let server_handle = MockServerHandle::spawn::<GetBalanceParams>(GetBalance::METHOD);
-        assert_eq!(
+        assert!(matches!(
             server_handle.get_balance("", ""),
             Err(Error::CryptoError {
                 context: "state_root_hash",
                 error: CryptoError::FromHex(FromHexError::InvalidStringLength)
-            }
-            .into())
-        );
+            })
+        ));
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn should_fail_with_empty_state_root_hash() {
         let server_handle = MockServerHandle::spawn::<GetBalanceParams>(GetBalance::METHOD);
-        assert_eq!(
+        assert!(matches!(
             server_handle.get_balance("", VALID_PURSE_UREF),
             Err(Error::CryptoError {
                 context: "state_root_hash",
                 error: CryptoError::FromHex(FromHexError::InvalidStringLength)
-            }
-            .into())
-        );
+            })
+        ));
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn should_fail_with_empty_purse_uref() {
         let server_handle = MockServerHandle::spawn::<GetBalanceParams>(GetBalance::METHOD);
-        assert_eq!(
+        assert!(matches!(
             server_handle.get_balance(VALID_STATE_ROOT_HASH, ""),
-            Err(Error::FailedToParseURef("purse_uref", URefFromStrError::InvalidPrefix).into())
-        );
+            Err(Error::FailedToParseURef(
+                "purse_uref",
+                URefFromStrError::InvalidPrefix
+            ))
+        ));
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn should_fail_with_bad_state_root_hash() {
         let server_handle = MockServerHandle::spawn::<GetBalanceParams>(GetBalance::METHOD);
-        assert_eq!(
+        assert!(matches!(
             server_handle.get_balance("deadbeef", VALID_PURSE_UREF),
             Err(Error::CryptoError {
                 context: "state_root_hash",
                 error: CryptoError::FromHex(FromHexError::InvalidStringLength)
-            }
-            .into())
-        );
+            })
+        ));
     }
 }
 
@@ -351,24 +320,24 @@ mod get_state_root_hash {
     async fn should_succeed_with_valid_block_id() {
         let server_handle =
             MockServerHandle::spawn::<GetStateRootHashParams>(GetStateRootHash::METHOD);
-        assert_eq!(
+        assert!(matches!(
             server_handle.get_state_root_hash(
                 "7a073a340bb5e0ca60f4c1dbb3254fb0641da79cda7c5aeb5303efa74fcc9eb1",
             ),
             Ok(())
-        );
+        ));
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn should_succeed_with_empty_block_id() {
         let server_handle = MockServerHandle::spawn_without_params(GetStateRootHash::METHOD);
-        assert_eq!(server_handle.get_state_root_hash(""), Ok(()));
+        assert!(matches!(server_handle.get_state_root_hash(""), Ok(())));
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn should_succeed_with_valid_block_height() {
         let server_handle = MockServerHandle::spawn_without_params(GetStateRootHash::METHOD);
-        assert_eq!(server_handle.get_state_root_hash("1"), Ok(()));
+        assert!(matches!(server_handle.get_state_root_hash("1"), Ok(())));
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -395,43 +364,43 @@ mod get_block {
     #[tokio::test(flavor = "multi_thread")]
     async fn should_succeed_with_valid_block_hash() {
         let server_handle = MockServerHandle::spawn::<GetBlockParams>(GetBlock::METHOD);
-        assert_eq!(
+        assert!(matches!(
             server_handle.get_block(VALID_STATE_ROOT_HASH),
-            Err(ErrWrapper(Error::InvalidResponse(
+            Err(Error::InvalidResponse(
                 ValidateResponseError::NoBlockInResponse
-            )))
-        );
+            ))
+        ));
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn should_succeed_with_valid_block_height() {
         let server_handle = MockServerHandle::spawn::<GetBlockParams>(GetBlock::METHOD);
-        assert_eq!(
+        assert!(matches!(
             server_handle.get_block("1"),
-            Err(ErrWrapper(Error::InvalidResponse(
+            Err(Error::InvalidResponse(
                 ValidateResponseError::NoBlockInResponse
-            )))
-        );
+            ))
+        ));
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn should_succeed_with_valid_empty_block_hash() {
         let server_handle = MockServerHandle::spawn_without_params(GetBlock::METHOD);
-        assert_eq!(
+        assert!(matches!(
             server_handle.get_block(""),
-            Err(ErrWrapper(Error::InvalidResponse(
+            Err(Error::InvalidResponse(
                 ValidateResponseError::NoBlockInResponse
-            )))
-        );
+            ))
+        ));
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn should_fail_with_invalid_block_id() {
         let server_handle = MockServerHandle::spawn::<GetBlockParams>(GetBlock::METHOD);
-        match server_handle.get_block("<not a valid hash>") {
-            Err(ErrWrapper(Error::FailedToParseInt("block_identifier", _))) => {}
-            other => panic!("incorrect error returned from client {:?}", other),
-        }
+        assert!(matches!(
+            server_handle.get_block("<not a valid hash>"),
+            Err(Error::FailedToParseInt("block_identifier", _))
+        ))
     }
 }
 
@@ -448,47 +417,45 @@ mod get_item {
         // in this case, the error means that the request was sent successfully, but due to to the
         // mock implementation fails to validate
 
-        assert_eq!(
+        assert!(matches!(
             server_handle.get_item(VALID_STATE_ROOT_HASH, VALID_PURSE_UREF, ""),
-            Err(
-                Error::InvalidResponse(ValidateResponseError::ValidateResponseFailedToParse).into()
-            )
-        );
+            Err(Error::InvalidResponse(
+                ValidateResponseError::ValidateResponseFailedToParse
+            ))
+        ));
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn should_fail_with_invalid_state_root_hash() {
         let server_handle = MockServerHandle::spawn::<GetItemParams>(GetItem::METHOD);
-        assert_eq!(
+        assert!(matches!(
             server_handle.get_item("<invalid state root hash>", VALID_PURSE_UREF, ""),
             Err(Error::CryptoError {
                 context: "state_root_hash",
                 error: CryptoError::FromHex(FromHexError::OddLength)
-            }
-            .into())
-        );
+            })
+        ));
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn should_fail_with_invalid_key() {
         let server_handle = MockServerHandle::spawn::<GetItemParams>(GetItem::METHOD);
-        assert_eq!(
+        assert!(matches!(
             server_handle.get_item(VALID_STATE_ROOT_HASH, "invalid key", ""),
-            Err(Error::FailedToParseKey.into())
-        );
+            Err(Error::FailedToParseKey)
+        ));
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn should_fail_with_empty_key() {
         let server_handle = MockServerHandle::spawn::<GetItemParams>(GetItem::METHOD);
-        assert_eq!(
+        assert!(matches!(
             server_handle.get_item("<invalid state root hash>", "", ""),
             Err(Error::CryptoError {
                 context: "state_root_hash",
                 error: CryptoError::FromHex(FromHexError::OddLength)
-            }
-            .into())
-        );
+            })
+        ));
     }
 }
 
@@ -498,24 +465,23 @@ mod get_deploy {
     #[tokio::test(flavor = "multi_thread")]
     async fn should_succeed_with_valid_hash() {
         let server_handle = MockServerHandle::spawn::<GetDeployParams>(GetDeploy::METHOD);
-        assert_eq!(
+        assert!(matches!(
             server_handle
                 .get_deploy("09dcee4b212cfd53642ab323fbef07dafafc6f945a80a00147f62910a915c4e6"),
             Ok(())
-        );
+        ));
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn should_fail_with_invalid_hash() {
         let server_handle = MockServerHandle::spawn::<GetDeployParams>(GetDeploy::METHOD);
-        assert_eq!(
+        assert!(matches!(
             server_handle.get_deploy("012345",),
             Err(Error::CryptoError {
                 context: "deploy_hash",
                 error: CryptoError::FromHex(FromHexError::InvalidStringLength)
-            }
-            .into())
-        );
+            })
+        ));
     }
 }
 
@@ -527,7 +493,7 @@ mod get_auction_info {
     #[tokio::test(flavor = "multi_thread")]
     async fn should_succeed() {
         let server_handle = MockServerHandle::spawn_without_params(GetAuctionInfo::METHOD);
-        assert_eq!(server_handle.get_auction_info(""), Ok(()));
+        assert!(matches!(server_handle.get_auction_info(""), Ok(())));
     }
 }
 
@@ -536,17 +502,16 @@ mod make_deploy {
 
     #[test]
     fn should_succeed_for_stdout() {
-        assert_eq!(
+        assert!(matches!(
             casper_client::make_deploy(
                 "",
                 deploy_params::test_data_valid(),
                 session_params::test_data_with_package_hash(),
                 payment_params::test_data_with_name(),
                 false
-            )
-            .map_err(ErrWrapper),
+            ),
             Ok(())
-        );
+        ));
     }
 
     #[test]
@@ -554,17 +519,17 @@ mod make_deploy {
         let temp_dir = TempDir::new()
             .unwrap_or_else(|err| panic!("Failed to create temp dir with error: {}", err));
         let file_path = temp_dir.path().join("test_deploy.json");
-        assert_eq!(
+
+        assert!(matches!(
             casper_client::make_deploy(
                 file_path.to_str().unwrap(),
                 deploy_params::test_data_valid(),
                 session_params::test_data_with_package_hash(),
                 payment_params::test_data_with_name(),
                 false
-            )
-            .map_err(ErrWrapper),
+            ),
             Ok(())
-        );
+        ));
     }
 
     #[test]
@@ -576,17 +541,16 @@ mod make_deploy {
         fs::write(file_path.clone(), &contents)
             .unwrap_or_else(|err| panic!("Failed to create temp file with error: {}", err));
 
-        assert_eq!(
+        assert!(matches!(
             casper_client::make_deploy(
                 file_path.to_str().unwrap(),
                 deploy_params::test_data_valid(),
                 session_params::test_data_with_package_hash(),
                 payment_params::test_data_with_name(),
                 false
-            )
-            .map_err(ErrWrapper),
-            Err(Error::FileAlreadyExists(file_path.clone()).into())
-        );
+            ),
+            Err(Error::FileAlreadyExists(_))
+        ));
 
         let contents_after_fail = fs::read_to_string(file_path).unwrap_or_else(|err| {
             panic!("Failed to read contents of test file with error: {}", err)
@@ -603,17 +567,16 @@ mod make_deploy {
         fs::write(file_path.clone(), "hi")
             .unwrap_or_else(|err| panic!("Failed to create temp file with error: {}", err));
 
-        assert_eq!(
+        assert!(matches!(
             casper_client::make_deploy(
                 file_path.to_str().unwrap(),
                 deploy_params::test_data_valid(),
                 session_params::test_data_with_package_hash(),
                 payment_params::test_data_with_name(),
                 true
-            )
-            .map_err(ErrWrapper),
+            ),
             Ok(())
-        );
+        ));
     }
 }
 
@@ -623,7 +586,7 @@ mod send_deploy {
     #[tokio::test(flavor = "multi_thread")]
     async fn should_fail_with_bad_deploy_file_path() {
         let server_handle = MockServerHandle::spawn::<PutDeployParams>(PutDeploy::METHOD);
-        if let Err(ErrWrapper(Error::IoError { context, .. })) =
+        if let Err(Error::IoError { context, .. }) =
             server_handle.send_deploy_file("<not a valid path>")
         {
             assert_eq!(context, "unable to read input file \'<not a valid path>\'")
@@ -635,22 +598,21 @@ mod send_deploy {
         let temp_dir = TempDir::new()
             .unwrap_or_else(|err| panic!("Failed to create temp dir with error: {}", err));
         let file_path = temp_dir.path().join("test_send_deploy.json");
-        assert_eq!(
+        assert!(matches!(
             casper_client::make_deploy(
                 file_path.to_str().unwrap(),
                 deploy_params::test_data_valid(),
                 session_params::test_data_with_package_hash(),
                 payment_params::test_data_with_name(),
                 false
-            )
-            .map_err(ErrWrapper),
+            ),
             Ok(())
-        );
+        ));
         let server_handle = MockServerHandle::spawn::<PutDeployParams>(PutDeploy::METHOD);
-        assert_eq!(
+        assert!(matches!(
             server_handle.send_deploy_file(file_path.to_str().unwrap()),
             Ok(())
-        );
+        ));
     }
 }
 
@@ -663,27 +625,25 @@ mod sign_deploy {
             .unwrap_or_else(|err| panic!("Failed to create temp dir with error: {}", err));
         let unsigned_file_path = temp_dir.path().join("test_deploy.json");
         let signed_file_path = temp_dir.path().join("signed_test_deploy.json");
-        assert_eq!(
+        assert!(matches!(
             casper_client::make_deploy(
                 unsigned_file_path.to_str().unwrap(),
                 deploy_params::test_data_valid(),
                 session_params::test_data_with_package_hash(),
                 payment_params::test_data_with_name(),
                 false
-            )
-            .map_err(ErrWrapper),
+            ),
             Ok(())
-        );
-        assert_eq!(
+        ));
+        assert!(matches!(
             casper_client::sign_deploy_file(
                 unsigned_file_path.to_str().unwrap(),
                 "../resources/local/secret_keys/node-1.pem",
                 signed_file_path.to_str().unwrap(),
                 false
-            )
-            .map_err(ErrWrapper),
+            ),
             Ok(())
-        );
+        ));
     }
 
     #[test]
@@ -691,27 +651,25 @@ mod sign_deploy {
         let temp_dir = TempDir::new()
             .unwrap_or_else(|err| panic!("Failed to create temp dir with error: {}", err));
         let unsigned_file_path = temp_dir.path().join("test_deploy.json");
-        assert_eq!(
+        assert!(matches!(
             casper_client::make_deploy(
                 unsigned_file_path.to_str().unwrap(),
                 deploy_params::test_data_valid(),
                 session_params::test_data_with_package_hash(),
                 payment_params::test_data_with_name(),
                 false
-            )
-            .map_err(ErrWrapper),
+            ),
             Ok(())
-        );
-        assert_eq!(
+        ));
+        assert!(matches!(
             casper_client::sign_deploy_file(
                 unsigned_file_path.to_str().unwrap(),
                 "../resources/local/secret_keys/node-1.pem",
                 "",
                 false
-            )
-            .map_err(ErrWrapper),
+            ),
             Ok(())
-        );
+        ));
     }
 
     #[test]
@@ -719,17 +677,16 @@ mod sign_deploy {
         let temp_dir = TempDir::new()
             .unwrap_or_else(|err| panic!("Failed to create temp dir with error: {}", err));
         let unsigned_file_path = temp_dir.path().join("test_deploy.json");
-        assert_eq!(
+        assert!(matches!(
             casper_client::make_deploy(
                 unsigned_file_path.to_str().unwrap(),
                 deploy_params::test_data_valid(),
                 session_params::test_data_with_package_hash(),
                 payment_params::test_data_with_name(),
                 false
-            )
-            .map_err(ErrWrapper),
+            ),
             Ok(())
-        );
+        ));
         assert!(casper_client::sign_deploy_file(
             unsigned_file_path.to_str().unwrap(),
             "<this is not a path>",
@@ -745,41 +702,38 @@ mod sign_deploy {
             .unwrap_or_else(|err| panic!("Failed to create temp dir with error: {}", err));
         let unsigned_file_path = temp_dir.path().join("test_deploy.json");
         let signed_file_path = temp_dir.path().join("signed_test_deploy.json");
-        assert_eq!(
+        assert!(matches!(
             casper_client::make_deploy(
                 unsigned_file_path.to_str().unwrap(),
                 deploy_params::test_data_valid(),
                 session_params::test_data_with_package_hash(),
                 payment_params::test_data_with_name(),
                 false
-            )
-            .map_err(ErrWrapper),
+            ),
             Ok(())
-        );
-        assert_eq!(
+        ));
+        assert!(matches!(
             casper_client::sign_deploy_file(
                 unsigned_file_path.to_str().unwrap(),
                 "../resources/local/secret_keys/node-1.pem",
                 signed_file_path.to_str().unwrap(),
                 false
-            )
-            .map_err(ErrWrapper),
+            ),
             Ok(())
-        );
+        ));
 
         let contents = fs::read_to_string(signed_file_path.clone())
             .unwrap_or_else(|err| panic!("Failed to read contents of file with error: {}", err));
 
-        assert_eq!(
+        assert!(matches!(
             casper_client::sign_deploy_file(
                 unsigned_file_path.to_str().unwrap(),
                 "../resources/local/secret_keys/node-1.pem",
                 signed_file_path.to_str().unwrap(),
                 false
-            )
-            .map_err(ErrWrapper),
-            Err(Error::FileAlreadyExists(signed_file_path.clone()).into())
-        );
+            ),
+            Err(Error::FileAlreadyExists(_))
+        ));
 
         let contents_after_failure = fs::read_to_string(signed_file_path)
             .unwrap_or_else(|err| panic!("Failed to read contents of file with error: {}", err));
@@ -793,37 +747,34 @@ mod sign_deploy {
             .unwrap_or_else(|err| panic!("Failed to create temp dir with error: {}", err));
         let unsigned_file_path = temp_dir.path().join("test_deploy.json");
         let signed_file_path = temp_dir.path().join("signed_test_deploy.json");
-        assert_eq!(
+        assert!(matches!(
             casper_client::make_deploy(
                 unsigned_file_path.to_str().unwrap(),
                 deploy_params::test_data_valid(),
                 session_params::test_data_with_package_hash(),
                 payment_params::test_data_with_name(),
                 false
-            )
-            .map_err(ErrWrapper),
+            ),
             Ok(())
-        );
-        assert_eq!(
+        ));
+        assert!(matches!(
             casper_client::sign_deploy_file(
                 unsigned_file_path.to_str().unwrap(),
                 "../resources/local/secret_keys/node-1.pem",
                 signed_file_path.to_str().unwrap(),
                 false
-            )
-            .map_err(ErrWrapper),
+            ),
             Ok(())
-        );
-        assert_eq!(
+        ));
+        assert!(matches!(
             casper_client::sign_deploy_file(
                 unsigned_file_path.to_str().unwrap(),
                 "../resources/local/secret_keys/node-1.pem",
                 signed_file_path.to_str().unwrap(),
                 true
-            )
-            .map_err(ErrWrapper),
+            ),
             Ok(())
-        );
+        ));
     }
 }
 
@@ -837,7 +788,7 @@ mod make_transfer {
 
     #[test]
     fn should_succeed_for_stdout() {
-        assert_eq!(
+        assert!(matches!(
             casper_client::make_transfer(
                 "",
                 AMOUNT,
@@ -846,10 +797,9 @@ mod make_transfer {
                 deploy_params::test_data_valid(),
                 payment_params::test_data_with_name(),
                 false
-            )
-            .map_err(ErrWrapper),
+            ),
             Ok(())
-        );
+        ));
     }
 
     #[test]
@@ -857,7 +807,7 @@ mod make_transfer {
         let temp_dir = TempDir::new()
             .unwrap_or_else(|err| panic!("Failed to create temp dir with error: {}", err));
         let file_path = temp_dir.path().join("test_deploy.json");
-        assert_eq!(
+        assert!(matches!(
             casper_client::make_transfer(
                 file_path.to_str().unwrap(),
                 AMOUNT,
@@ -866,10 +816,9 @@ mod make_transfer {
                 deploy_params::test_data_valid(),
                 payment_params::test_data_with_name(),
                 false
-            )
-            .map_err(ErrWrapper),
+            ),
             Ok(())
-        );
+        ));
     }
 
     #[test]
@@ -881,7 +830,7 @@ mod make_transfer {
         fs::write(file_path.clone(), &contents)
             .unwrap_or_else(|err| panic!("Failed to create temp file with error: {}", err));
 
-        assert_eq!(
+        assert!(matches!(
             casper_client::make_transfer(
                 file_path.to_str().unwrap(),
                 AMOUNT,
@@ -890,10 +839,9 @@ mod make_transfer {
                 deploy_params::test_data_valid(),
                 payment_params::test_data_with_name(),
                 false
-            )
-            .map_err(ErrWrapper),
-            Err(Error::FileAlreadyExists(file_path.clone()).into())
-        );
+            ),
+            Err(Error::FileAlreadyExists(_))
+        ));
 
         let contents_after_fail = fs::read_to_string(file_path)
             .unwrap_or_else(|err| panic!("Failed to read from temp file with error: {}", err));
@@ -909,7 +857,7 @@ mod make_transfer {
         fs::write(file_path.clone(), "hi")
             .unwrap_or_else(|err| panic!("Failed to create temp file with error: {}", err));
 
-        assert_eq!(
+        assert!(matches!(
             casper_client::make_transfer(
                 file_path.to_str().unwrap(),
                 AMOUNT,
@@ -918,10 +866,9 @@ mod make_transfer {
                 deploy_params::test_data_valid(),
                 payment_params::test_data_with_name(),
                 true
-            )
-            .map_err(ErrWrapper),
+            ),
             Ok(())
-        );
+        ));
     }
 }
 
@@ -937,9 +884,8 @@ mod keygen_generate_files {
             path.to_str().unwrap(),
             casper_client::keygen::ED25519,
             true,
-        )
-        .map_err(ErrWrapper);
-        assert_eq!(result, Ok(()));
+        );
+        assert!(matches!(result, Ok(())))
     }
 
     #[test]
@@ -951,9 +897,9 @@ mod keygen_generate_files {
             path.to_str().unwrap(),
             casper_client::keygen::SECP256K1,
             true,
-        )
-        .map_err(ErrWrapper);
-        assert_eq!(result, Ok(()));
+        );
+
+        assert!(matches!(result, Ok(())));
     }
 
     #[test]
@@ -965,26 +911,20 @@ mod keygen_generate_files {
             path.to_str().unwrap(),
             casper_client::keygen::SECP256K1,
             false,
-        )
-        .map_err(ErrWrapper);
-        assert_eq!(result, Ok(()));
+        );
+        assert!(matches!(result, Ok(())));
         let result = casper_client::keygen::generate_files(
             path.to_str().unwrap(),
             casper_client::keygen::SECP256K1,
             false,
-        )
-        .map_err(ErrWrapper);
-        assert_eq!(
-            result,
-            Err(Error::FileAlreadyExists(path.join("secret_key.pem")).into())
         );
+        assert!(matches!(result, Err(Error::FileAlreadyExists(_))));
         let result = casper_client::keygen::generate_files(
             path.to_str().unwrap(),
             casper_client::keygen::SECP256K1,
             true,
-        )
-        .map_err(ErrWrapper);
-        assert_eq!(result, Ok(()));
+        );
+        assert!(matches!(result, Ok(())));
     }
 
     #[test]
@@ -996,28 +936,16 @@ mod keygen_generate_files {
             path.to_str().unwrap(),
             "<not a valid algo>",
             true,
-        )
-        .map_err(ErrWrapper);
-        assert_eq!(
-            result,
-            Err(Error::UnsupportedAlgorithm("<not a valid algo>".to_string()).into())
         );
+        assert!(matches!(result, Err(Error::UnsupportedAlgorithm(_))));
     }
 
     #[test]
     fn should_fail_for_invalid_output_dir() {
         let path = "";
         let result =
-            casper_client::keygen::generate_files(path, casper_client::keygen::ED25519, true)
-                .map_err(ErrWrapper);
-        assert_eq!(
-            result,
-            Err(Error::InvalidArgument(
-                "generate_files",
-                "empty output_dir provided, must be a valid path".to_string()
-            )
-            .into())
-        );
+            casper_client::keygen::generate_files(path, casper_client::keygen::ED25519, true);
+        assert!(matches!(result, Err(Error::InvalidArgument(_, _))))
     }
 }
 
@@ -1027,14 +955,14 @@ mod put_deploy {
     #[tokio::test(flavor = "multi_thread")]
     async fn should_send_put_deploy() {
         let server_handle = MockServerHandle::spawn::<PutDeployParams>(PutDeploy::METHOD);
-        assert_eq!(
+        assert!(matches!(
             server_handle.put_deploy(
                 deploy_params::test_data_valid(),
                 session_params::test_data_with_package_hash(),
                 payment_params::test_data_with_name()
             ),
             Ok(())
-        );
+        ));
     }
 }
 
@@ -1056,8 +984,8 @@ mod rate_limit {
             let maybe_target_account =
                 "01522ef6c89038019cb7af05c340623804392dd2bb1f4dab5e4a9c3ab752fc0179";
 
-            // If you remove the tokio::task::spawn_blocking call wrapping the call to transfer, the
-            // client will eventually eat all executor threads and deadlock (at 64 consecutive
+            // If you remove the tokio::task::spawn_blocking call wrapping the call to transfer,
+            // the client will eventually eat all executor threads and deadlock (at 64 consecutive
             // requests). I believe this is happening because the server is executing on the same
             // tokio runtime as the client.
             let server_handle = server_handle.clone();
@@ -1069,7 +997,7 @@ mod rate_limit {
                     payment_params::test_data_with_name(),
                 )
             });
-            assert_eq!(join_handle.await.unwrap(), Ok(()));
+            assert!(matches!(join_handle.await.unwrap(), Ok(())));
         }
 
         let diff = now.elapsed();
@@ -1091,12 +1019,12 @@ mod transfer {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn should_succeed() {
-        // Transfer uses PutDeployParams + PutDeploy
+        // // Transfer uses PutDeployParams + PutDeploy
         let server_handle = MockServerHandle::spawn::<PutDeployParams>(PutDeploy::METHOD);
         let amount = "100";
         let maybe_target_account =
             "01522ef6c89038019cb7af05c340623804392dd2bb1f4dab5e4a9c3ab752fc0179";
-        assert_eq!(
+        assert!(matches!(
             server_handle.transfer(
                 amount,
                 maybe_target_account,
@@ -1104,6 +1032,6 @@ mod transfer {
                 payment_params::test_data_with_name()
             ),
             Ok(())
-        );
+        ));
     }
 }

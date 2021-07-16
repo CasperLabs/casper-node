@@ -606,21 +606,6 @@ mod tests {
 
     use super::*;
 
-    #[derive(Debug)]
-    struct ErrWrapper(pub Error);
-
-    impl PartialEq for ErrWrapper {
-        fn eq(&self, other: &ErrWrapper) -> bool {
-            format!("{:?}", self.0) == format!("{:?}", other.0)
-        }
-    }
-
-    impl From<Error> for ErrWrapper {
-        fn from(error: Error) -> Self {
-            ErrWrapper(error)
-        }
-    }
-
     mod bad {
         pub const EMPTY: &str = "";
         pub const ARG_UNQUOTED: &str = "name:u32=0"; // value needs single quotes to be valid
@@ -668,16 +653,12 @@ mod tests {
 
     fn invalid_simple_args_test(cli_string: &str) {
         assert!(
-            arg_simple::payment::parse(&[cli_string])
-                .map_err(ErrWrapper)
-                .is_err(),
+            arg_simple::payment::parse(&[cli_string]).is_err(),
             "{} should be an error",
             cli_string
         );
         assert!(
-            arg_simple::session::parse(&[cli_string])
-                .map_err(ErrWrapper)
-                .is_err(),
+            arg_simple::session::parse(&[cli_string]).is_err(),
             "{} should be an error",
             cli_string
         );
@@ -869,7 +850,7 @@ mod tests {
 
     #[test]
     fn should_fail_to_parse_conflicting_arg_types() {
-        assert_eq!(
+        assert!(matches!(
             parse_session_info(
                 "",
                 "name",
@@ -881,16 +862,14 @@ mod tests {
                 "",
                 "entrypoint",
                 false
-            )
-            .map(|_| ())
-            .map_err(ErrWrapper),
+            ),
             Err(Error::ConflictingArguments {
                 context: "parse_session_info",
-                args: vec!["session_args".to_owned(), "session_args_complex".to_owned()]
-            }
-            .into())
-        );
-        assert_eq!(
+                ..
+            })
+        ));
+
+        assert!(matches!(
             parse_payment_info(
                 "",
                 "name",
@@ -902,20 +881,17 @@ mod tests {
                 "path_to/file",
                 "",
                 "entrypoint",
-            )
-            .map(|_| ())
-            .map_err(ErrWrapper),
+            ),
             Err(Error::ConflictingArguments {
                 context: "parse_payment_info",
-                args: vec!["payment_args".to_owned(), "payment_args_complex".to_owned()]
-            }
-            .into())
-        );
+                ..
+            })
+        ));
     }
 
     #[test]
     fn should_fail_to_parse_conflicting_session_parameters() {
-        assert_eq!(
+        assert!(matches!(
             parse_session_info(
                 happy::HASH,
                 happy::NAME,
@@ -927,42 +903,34 @@ mod tests {
                 "",
                 "",
                 false
-            )
-            .map(|_| ())
-            .map_err(ErrWrapper),
+            ),
             Err(Error::ConflictingArguments {
                 context: "parse_session_info",
-                args: vec![
-                    "session_hash=09dcee4b212cfd53642ab323fbef07dafafc6f945a80a00147f62910a915c4e6".into(),
-                    "session_name=name".into(),
-                    "session_package_hash=09dcee4b212cfd53642ab323fbef07dafafc6f945a80a00147f62910a915c4e6".into(),
-                    "session_package_name=package_name".into(),
-                    "session_path=./session.wasm".into()
-                ]
-            }
-            .into())
-        );
+                ..
+            })
+        ));
     }
 
     #[test]
     fn should_fail_to_parse_conflicting_payment_parameters() {
-        assert_eq!(
-            parse_payment_info("12345", happy::HASH, happy::NAME, happy::PACKAGE_HASH, happy::PACKAGE_NAME, happy::PATH, &[], "", "", "",)
-                .map(|_| ())
-                .map_err(ErrWrapper),
+        assert!(matches!(
+            parse_payment_info(
+                "12345",
+                happy::HASH,
+                happy::NAME,
+                happy::PACKAGE_HASH,
+                happy::PACKAGE_NAME,
+                happy::PATH,
+                &[],
+                "",
+                "",
+                "",
+            ),
             Err(Error::ConflictingArguments {
                 context: "parse_payment_info",
-                args: vec![
-                    "payment_amount=12345".into(),
-                    "payment_hash=09dcee4b212cfd53642ab323fbef07dafafc6f945a80a00147f62910a915c4e6".into(),
-                    "payment_name=name".into(),
-                    "payment_package_hash=09dcee4b212cfd53642ab323fbef07dafafc6f945a80a00147f62910a915c4e6".into(),
-                    "payment_package_name=package_name".into(),
-                    "payment_path=./session.wasm".into(),
-                ]
-            }
-            .into())
-        );
+                ..
+            })
+        ));
     }
 
     mod missing_args {
@@ -974,24 +942,13 @@ mod tests {
             ($t:ident, $name:ident, $field:tt => $value:expr, missing: $missing:expr, context: $context:expr) => {
                 #[test]
                 fn $name() {
-                    let info: StdResult<ExecutableDeployItem, ErrWrapper> = $t {
+                    let info: StdResult<ExecutableDeployItem, Error> = $t {
                         $field: $value,
                         ..Default::default()
                     }
-                    .try_into()
-                    .map_err(ErrWrapper);
-                    assert_eq!(
-                        info,
-                        Err(Error::InvalidArgument(
-                            $context,
-                            format!(
-                                "Field {} also requires following fields to be provided: {:?}",
-                                stringify!($field),
-                                $missing
-                            )
-                        )
-                        .into())
-                    );
+                    .try_into();
+
+                    assert!(matches!(info, Err(Error::InvalidArgument($context, _msg))));
                 }
             };
         }
@@ -1086,25 +1043,24 @@ mod tests {
         ///
         ///     #[test]
         ///     fn path_conflicts_with_package_hash() {
-        ///         let info: StdResult<ExecutableDeployItem, ErrWrapper> = SessionStrParams {
+        ///         let info: StdResult<ExecutableDeployItem, _> = SessionStrParams {
         ///                 session_path: happy::PATH,
         ///                 session_package_hash: happy::PACKAGE_HASH,
         ///                 ..Default::default()
         ///             }
-        ///             .try_into()
-        ///             .map_err(ErrWrapper);
+        ///             .try_into();
         ///         let mut conflicting = vec![
         ///             format!("{}={}", "session_path", happy::PATH),
         ///             format!("{}={}", "session_package_hash", happy::PACKAGE_HASH),
         ///         ];
         ///         conflicting.sort();
-        ///         assert_eq!(
+        ///         assert!(matches!(
         ///             info,
         ///             Err(Error::ConflictingArguments {
         ///                 context: "parse_session_info",
         ///                 args: conflicting
         ///             }
-        ///             .into())
+        ///             ))
         ///         );
         ///     }
         /// }
@@ -1138,26 +1094,25 @@ mod tests {
                     $(
                         #[test]
                         fn $test_fn_name() {
-                            let info: StdResult<ExecutableDeployItem, ErrWrapper> = $t {
+                            let info: StdResult<ExecutableDeployItem, _> = $t {
                                 $arg: $arg_value,
                                 $con: $con_value,
                                 $($req: $req_value,),*
                                 ..Default::default()
                             }
-                            .try_into()
-                            .map_err(ErrWrapper);
+                            .try_into();
                             let mut conflicting = vec![
                                 format!("{}={}", stringify!($arg), $arg_value),
                                 format!("{}={}", stringify!($con), $con_value),
                             ];
                             conflicting.sort();
-                            assert_eq!(
+                            assert!(matches!(
                                 info,
                                 Err(Error::ConflictingArguments {
                                     context: $context,
-                                    args: conflicting
+                                    ..
                                 }
-                                .into())
+                                ))
                             );
                         }
                     )+

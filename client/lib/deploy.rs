@@ -394,15 +394,6 @@ mod tests {
       ]
     }"#;
 
-    #[derive(Debug)]
-    struct ErrWrapper(pub Error);
-
-    impl PartialEq for ErrWrapper {
-        fn eq(&self, other: &ErrWrapper) -> bool {
-            format!("{:?}", self.0) == format!("{:?}", other.0)
-        }
-    }
-
     pub fn deploy_params() -> DeployStrParams<'static> {
         DeployStrParams {
             secret_key: "../resources/local/secret_keys/node-1.pem",
@@ -494,10 +485,7 @@ mod tests {
     #[test]
     fn should_read_deploy() {
         let bytes = SAMPLE_DEPLOY.as_bytes();
-        assert_eq!(
-            Deploy::read_deploy(bytes).map(|_| ()).map_err(ErrWrapper),
-            Ok(())
-        );
+        assert!(matches!(Deploy::read_deploy(bytes), Ok(_)));
     }
 
     #[test]
