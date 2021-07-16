@@ -319,6 +319,7 @@ where
                         responder,
                     } => {
                         let result = self.commit_genesis(chainspec);
+                        self.engine_state.flush_environment();
                         responder.respond(result).ignore()
                     }
                     ContractRuntimeRequest::Upgrade {
@@ -333,6 +334,7 @@ where
                             let start = Instant::now();
                             let result =
                                 engine_state.commit_upgrade(correlation_id, *upgrade_config);
+                            engine_state.flush_environment();
                             metrics
                                 .commit_upgrade
                                 .observe(start.elapsed().as_secs_f64());
@@ -472,6 +474,7 @@ where
                             let correlation_id = CorrelationId::new();
                             let start = Instant::now();
                             let result = engine_state.commit_step(correlation_id, step_request);
+                            engine_state.flush_environment();
                             metrics.commit_step.observe(start.elapsed().as_secs_f64());
                             trace!(?result, "step response");
                             responder.respond(result).await
@@ -514,6 +517,7 @@ where
                                     correlation_id,
                                     &*trie,
                                 );
+                            engine_state.flush_environment();
                             metrics.put_trie.observe(start.elapsed().as_secs_f64());
                             trace!(?result, "put_trie response");
                             responder.respond(result).await
@@ -948,6 +952,7 @@ impl ContractRuntime {
                     Err(_err) => panic!("unable to commit"),
                 }
             }
+            engine_state.flush_environment();
             state
         }
         .event(|state| Event::Result(Box::new(ContractRuntimeResult::ExecutedAndCommitted(state))))

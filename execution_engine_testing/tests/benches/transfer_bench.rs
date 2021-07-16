@@ -12,7 +12,7 @@ use casper_engine_test_support::{
     },
     MINIMUM_ACCOUNT_CREATION_BALANCE,
 };
-use casper_execution_engine::core::engine_state::EngineConfig;
+use casper_execution_engine::core::engine_state::{EngineConfig, ExecuteRequest};
 use casper_types::{account::AccountHash, runtime_args, Key, RuntimeArgs, URef, U512};
 
 const CONTRACT_CREATE_ACCOUNTS: &str = "create_accounts.wasm";
@@ -24,11 +24,14 @@ const CONTRACT_TRANSFER_TO_PURSE: &str = "transfer_to_purse.wasm";
 const TRANSFER_BATCH_SIZE: u64 = 3;
 const TARGET_ADDR: AccountHash = AccountHash::new([127; 32]);
 const ARG_AMOUNT: &str = "amount";
+const ARG_ID: &str = "id";
 const ARG_ACCOUNTS: &str = "accounts";
 const ARG_SEED_AMOUNT: &str = "seed_amount";
 const ARG_TOTAL_PURSES: &str = "total_purses";
 const ARG_TARGET: &str = "target";
 const ARG_TARGET_PURSE: &str = "target_purse";
+
+const BLOCK_TRANSFER_COUNT: usize = 2500;
 
 /// Converts an integer into an array of type [u8; 32] by converting integer
 /// into its big endian representation and embedding it at the end of the
@@ -247,6 +250,67 @@ pub fn transfer_to_existing_accounts(group: &mut BenchmarkGroup<WallTime>, shoul
     );
 }
 
+pub fn multiple_native_transfers(group: &mut BenchmarkGroup<WallTime>) {
+    let target_account = TARGET_ADDR;
+    let bootstrap_accounts = vec![target_account];
+
+    let data_dir = TempDir::new().expect("should create temp dir");
+    let mut builder = bootstrap(
+        data_dir.path(),
+        bootstrap_accounts,
+        U512::from(MINIMUM_ACCOUNT_CREATION_BALANCE),
+    );
+
+    let purse_amount = U512::one();
+    let purses = create_purses(&mut builder, target_account, 100, purse_amount);
+
+    let mut purse_index = 0usize;
+    let mut exec_requests = Vec::with_capacity(BLOCK_TRANSFER_COUNT);
+    for _ in 0..BLOCK_TRANSFER_COUNT {
+        let account = {
+            let account = purses[purse_index];
+            if purse_index == purses.len() - 1 {
+                purse_index = 0;
+            } else {
+                purse_index += 1;
+            }
+            account
+        };
+        let mut exec_builder = ExecuteRequestBuilder::new();
+        let runtime_args = runtime_args! {
+            ARG_TARGET => account,
+            ARG_AMOUNT => U512::one(),
+            ARG_ID => <Option<u64>>::None
+        };
+        let native_transfer = DeployItemBuilder::new()
+            .with_address(*DEFAULT_ACCOUNT_ADDR)
+            .with_empty_payment_bytes(runtime_args! {})
+            .with_transfer_args(runtime_args)
+            .with_authorization_keys(&[*DEFAULT_ACCOUNT_ADDR])
+            .build();
+        exec_builder = exec_builder.push_deploy(native_transfer);
+        let exec_request = exec_builder.build();
+        exec_requests.push(exec_request);
+    }
+
+    group.bench_function(
+        format!("multiple_native_transfers/{}", BLOCK_TRANSFER_COUNT),
+        |b| b.iter(|| transfer_to_account_multiple_native_transfers(&mut builder, &exec_requests)),
+    );
+}
+
+fn transfer_to_account_multiple_native_transfers(
+    builder: &mut LmdbWasmTestBuilder,
+    execute_requests: &[ExecuteRequest],
+) {
+    for exec_request in execute_requests.iter().cloned() {
+        let builder = builder.exec(exec_request).expect_success();
+        builder.commit();
+    }
+    // flush to disk only after entire set of deploys has been executed
+    builder.flush_environment();
+}
+
 pub fn transfer_to_existing_purses(group: &mut BenchmarkGroup<WallTime>, should_commit: bool) {
     let target_account = TARGET_ADDR;
     let bootstrap_accounts = vec![target_account];
@@ -298,6 +362,22 @@ pub fn transfer_to_existing_purses(group: &mut BenchmarkGroup<WallTime>, should_
     );
 }
 
+pub fn native_transfer_bench(c: &mut Criterion) {
+    let mut group = c.benchmark_group("tps_native");
+
+    // Minimum number of samples and measurement times to decrease the total time of this benchmark.
+    // This may or may not decrease the quality of the numbers.
+    group.sample_size(10);
+    group.measurement_time(Duration::from_secs(60));
+
+    // Measure by elements where one element per second is one transaction per second
+    group.throughput(Throughput::Elements(BLOCK_TRANSFER_COUNT as u64));
+
+    multiple_native_transfers(&mut group);
+
+    group.finish();
+}
+
 pub fn transfer_bench(c: &mut Criterion) {
     let mut group = c.benchmark_group("tps");
 
@@ -324,5 +404,6 @@ pub fn transfer_bench(c: &mut Criterion) {
     group.finish();
 }
 
+criterion_group!(transfer_benches, native_transfer_bench);
 criterion_group!(benches, transfer_bench);
-criterion_main!(benches);
+criterion_main!(benches, transfer_benches);

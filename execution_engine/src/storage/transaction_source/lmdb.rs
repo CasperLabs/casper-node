@@ -75,9 +75,13 @@ impl LmdbEnvironment {
         map_size: usize,
         max_readers: u32,
     ) -> Result<Self, error::Error> {
+        // These options mean we must manually call sync on the environment for the EE.
+        let fast_options = EnvironmentFlags::MAP_ASYNC
+            | EnvironmentFlags::WRITE_MAP
+            | EnvironmentFlags::NO_META_SYNC;
         let env = Environment::new()
             // Set the flag to manage our own directory like in the storage component.
-            .set_flags(EnvironmentFlags::NO_SUB_DIR)
+            .set_flags(EnvironmentFlags::NO_SUB_DIR | fast_options)
             .set_max_dbs(MAX_DBS)
             .set_map_size(map_size)
             .set_max_readers(max_readers)

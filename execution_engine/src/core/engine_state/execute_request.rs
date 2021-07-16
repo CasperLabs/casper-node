@@ -5,7 +5,7 @@ use casper_types::{ProtocolVersion, PublicKey, SecretKey};
 use super::deploy_item::DeployItem;
 use crate::shared::newtypes::Blake2bHash;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ExecuteRequest {
     pub parent_state_hash: Blake2bHash,
     pub block_time: u64,

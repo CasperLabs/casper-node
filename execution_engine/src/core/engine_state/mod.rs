@@ -83,7 +83,7 @@ use crate::{
         wasm_prep::Preprocessor,
     },
     storage::{
-        global_state::{CommitResult, StateProvider},
+        global_state::{lmdb::LmdbGlobalState, CommitResult, StateProvider},
         protocol_data::ProtocolData,
         trie::Trie,
     },
@@ -101,6 +101,16 @@ pub struct EngineState<S> {
     config: EngineConfig,
     system_contract_cache: SystemContractCache,
     state: S,
+}
+
+impl EngineState<LmdbGlobalState> {
+    pub fn flush_environment(&self) {
+        self.state
+            .environment
+            .env()
+            .sync(true)
+            .expect("should flush environment")
+    }
 }
 
 impl<S> EngineState<S>
