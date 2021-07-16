@@ -162,7 +162,7 @@ impl MockServerHandle {
             0,
             amount,
             maybe_target_account,
-            "2",
+            2,
             deploy_params,
             payment_params,
         )
@@ -833,7 +833,7 @@ mod make_transfer {
     const AMOUNT: &str = "30000000000";
     const TARGET_ACCOUNT: &str =
         "01aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-    const TRANSFER_ID: &str = "1314";
+    const TRANSFER_ID: u64 = 1314;
 
     #[test]
     fn should_succeed_for_stdout() {

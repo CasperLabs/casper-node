@@ -367,7 +367,7 @@ pub extern "C" fn casper_transfer(
     verbosity_level: u64,
     amount: *const c_char,
     maybe_target_account: *const c_char,
-    transfer_id: *const c_char,
+    transfer_id: u64,
     deploy_params: *const casper_deploy_params_t,
     payment_params: *const casper_payment_params_t,
     response_buf: *mut c_uchar,
@@ -379,7 +379,6 @@ pub extern "C" fn casper_transfer(
     let node_address = try_unsafe_arg!(node_address);
     let amount = try_unsafe_arg!(amount);
     let maybe_target_account = try_unsafe_arg!(maybe_target_account);
-    let transfer_id = try_unsafe_arg!(transfer_id);
     let deploy_params = try_arg_into!(deploy_params);
     let payment_params = try_arg_into!(payment_params);
     runtime.block_on(async move {
@@ -407,7 +406,7 @@ pub extern "C" fn casper_make_transfer(
     maybe_output_path: *const c_char,
     amount: *const c_char,
     maybe_target_account: *const c_char,
-    transfer_id: *const c_char,
+    transfer_id: u64,
     deploy_params: *const casper_deploy_params_t,
     payment_params: *const casper_payment_params_t,
     force: bool,
@@ -415,7 +414,6 @@ pub extern "C" fn casper_make_transfer(
     let maybe_output_path = try_unsafe_arg!(maybe_output_path);
     let amount = try_unsafe_arg!(amount);
     let maybe_target_account = try_unsafe_arg!(maybe_target_account);
-    let transfer_id = try_unsafe_arg!(transfer_id);
     let deploy_params = try_arg_into!(deploy_params);
     let payment_params = try_arg_into!(payment_params);
     let result = super::make_transfer(

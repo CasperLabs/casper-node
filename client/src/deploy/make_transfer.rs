@@ -35,7 +35,9 @@ impl<'a, 'b> ClientCommand<'a, 'b> for MakeTransfer {
 
         let amount = transfer::amount::get(matches);
         let target_account = transfer::target_account::get(matches);
-        let transfer_id = transfer::transfer_id::get(matches);
+        let transfer_id = transfer::transfer_id::get(matches)
+            .parse::<u64>()
+            .map_err(|e| Error::FailedToParseInt("transfer-id", e))?;
 
         let secret_key = common::secret_key::get(matches);
         let timestamp = creation_common::timestamp::get(matches);

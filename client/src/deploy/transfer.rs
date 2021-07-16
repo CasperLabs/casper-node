@@ -107,7 +107,9 @@ impl<'a, 'b> ClientCommand<'a, 'b> for Transfer {
 
         let amount = amount::get(matches);
         let target_account = target_account::get(matches);
-        let transfer_id = transfer_id::get(matches);
+        let transfer_id = transfer_id::get(matches)
+            .parse::<u64>()
+            .map_err(|e| Error::FailedToParseInt("transfer-id", e))?;
 
         let maybe_rpc_id = common::rpc_id::get(matches);
         let node_address = common::node_address::get(matches);

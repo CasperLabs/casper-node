@@ -587,12 +587,6 @@ fn version(value: &str) -> Result<u32> {
         .map_err(|error| Error::FailedToParseInt("version", error))
 }
 
-pub(crate) fn transfer_id(value: &str) -> Result<u64> {
-    value
-        .parse()
-        .map_err(|error| Error::FailedToParseInt("transfer-id", error))
-}
-
 #[cfg(test)]
 mod tests {
     use std::{convert::TryFrom, result::Result as StdResult};

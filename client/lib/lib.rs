@@ -184,8 +184,8 @@ pub fn send_deploy_file(
 /// * `amount` is a string to be parsed as a `U512` specifying the amount to be transferred.
 /// * `target_account` is the account `PublicKey` into which the funds will be transferred,
 ///   formatted as a hex-encoded string. The account's main purse will receive the funds.
-/// * `transfer_id` is a string to be parsed as a `u64` representing a user-defined identifier which
-///   will be permanently associated with the transfer.
+/// * `transfer_id` is a `u64` representing a user-defined identifier which will be permanently
+///   associated with the transfer.
 /// * `deploy_params` contains deploy-related options for this `Deploy`. See
 ///   [`DeployStrParams`](struct.DeployStrParams.html) for more details.
 /// * `payment_params` contains payment-related options for this `Deploy`. See
@@ -197,7 +197,7 @@ pub fn transfer(
     verbosity_level: u64,
     amount: &str,
     target_account: &str,
-    transfer_id: &str,
+    transfer_id: u64,
     deploy_params: DeployStrParams<'_>,
     payment_params: PaymentStrParams<'_>,
 ) -> Result<JsonRpc> {
@@ -205,7 +205,6 @@ pub fn transfer(
         .map_err(|err| Error::FailedToParseUint("amount", UIntParseError::FromDecStr(err)))?;
     let source_purse = None;
     let target = parsing::get_transfer_target(target_account)?;
-    let transfer_id = parsing::transfer_id(transfer_id)?;
 
     RpcCall::new(maybe_rpc_id, node_address, verbosity_level).transfer(
         amount,
@@ -227,8 +226,8 @@ pub fn transfer(
 /// * `amount` is a string to be parsed as a `U512` specifying the amount to be transferred.
 /// * `target_account` is the account `PublicKey` into which the funds will be transferred,
 ///   formatted as a hex-encoded string. The account's main purse will receive the funds.
-/// * `transfer_id` is a string to be parsed as a `u64` representing a user-defined identifier which
-///   will be permanently associated with the transfer.
+/// * `transfer_id` is a `u64` representing a user-defined identifier which will be permanently
+///   associated with the transfer.
 /// * `deploy_params` contains deploy-related options for this `Deploy`. See
 ///   [`DeployStrParams`](struct.DeployStrParams.html) for more details.
 /// * `payment_params` contains payment-related options for this `Deploy`. See
@@ -241,7 +240,7 @@ pub fn make_transfer(
     maybe_output_path: &str,
     amount: &str,
     target_account: &str,
-    transfer_id: &str,
+    transfer_id: u64,
     deploy_params: DeployStrParams<'_>,
     payment_params: PaymentStrParams<'_>,
     force: bool,
@@ -250,7 +249,6 @@ pub fn make_transfer(
         .map_err(|err| Error::FailedToParseUint("amount", UIntParseError::FromDecStr(err)))?;
     let source_purse = None;
     let target = parsing::get_transfer_target(target_account)?;
-    let transfer_id = parsing::transfer_id(transfer_id)?;
 
     let output = if maybe_output_path.is_empty() {
         OutputKind::Stdout
