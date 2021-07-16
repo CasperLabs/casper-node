@@ -28,9 +28,10 @@ use jsonrpc_lite::JsonRpc;
 use serde::Serialize;
 
 use casper_execution_engine::core::engine_state::ExecutableDeployItem;
-use casper_node::types::Deploy;
+use casper_node::types::{BlockHash, Deploy};
 use casper_types::{UIntParseError, U512};
 
+use casper_node::{crypto::hash::Digest, rpcs::state::GlobalStateIdentifier};
 pub use cl_type::help;
 pub use deploy::ListDeploysResult;
 use deploy::{DeployExt, DeployParams, OutputKind};
@@ -498,6 +499,50 @@ pub fn get_account_info(
 ) -> Result<JsonRpc> {
     RpcCall::new(maybe_rpc_id, node_address, verbosity_level)
         .get_account_info(public_key, maybe_block_id)
+}
+
+/// Retrieves information from global state using either a Block hash or a state root hash.
+///
+/// * `maybe_rpc_id` is the JSON-RPC identifier, applied to the request and returned in the
+///   response. If it can be parsed as an `i64` it will be used as a JSON integer. If empty, a
+///   random `i64` will be assigned. Otherwise the provided string will be used verbatim.
+/// * `node_address` is the hostname or IP and port of the node on which the HTTP service is
+///   running, e.g. `"http://127.0.0.1:7777"`.
+/// * When `verbosity_level` is `1`, the JSON-RPC request will be printed to `stdout` with long
+///   string fields (e.g. hex-formatted raw Wasm bytes) shortened to a string indicating the char
+///   count of the field.  When `verbosity_level` is greater than `1`, the request will be printed
+///   to `stdout` with no abbreviation of long fields.  When `verbosity_level` is `0`, the request
+///   will not be printed to `stdout`.
+/// * `state_identifier` is a str value that identifies the supplied 32-byte hex encoded hash as as
+///   either a `Block` hash or a specific `state_root_hash`.
+/// * `hash` is a 32-byte hex encoded hash which can either be the block hash or state root hash and
+///   is identified by the `state_identifier` arg.
+/// * `state_root_hash` must be a hex-encoded, 32-byte hash digest.
+/// * `key` must be a formatted [`PublicKey`](https://docs.rs/casper-node/latest/casper-node/crypto/asymmetric_key/enum.PublicKey.html)
+///   or [`Key`](https://docs.rs/casper-types/latest/casper-types/enum.PublicKey.html). This will
+///   take one of the following forms:
+/// ```text
+/// 01c9e33693951aaac23c49bee44ad6f863eedcd38c084a3a8f11237716a3df9c2c           # PublicKey
+/// account-hash-0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20  # Key::Account
+/// hash-0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20        # Key::Hash
+/// uref-0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20-007    # Key::URef
+/// transfer-0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20    # Key::Transfer
+/// deploy-0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20      # Key::DeployInfo
+/// ```
+/// * `path` is comprised of components starting from the `key`, separated by `/`s.
+pub fn global_state_query(
+    maybe_rpc_id: &str,
+    node_address: &str,
+    verbosity_level: u64,
+    global_state_str_params: GlobalStateStrParams<'_>,
+    key: &str,
+    path: &str,
+) -> Result<JsonRpc> {
+    RpcCall::new(maybe_rpc_id, node_address, verbosity_level).query_global_state(
+        global_state_str_params,
+        key,
+        path,
+    )
 }
 
 /// Retrieves information and examples for all currently supported RPCs.
@@ -1001,6 +1046,33 @@ impl<'a> SessionStrParams<'a> {
             session_args_simple,
             session_args_complex,
             ..Default::default()
+        }
+    }
+}
+
+/// Container for `GlobalStateIdentifier` construction options.
+#[derive(Default, Debug)]
+pub struct GlobalStateStrParams<'a> {
+    /// Identifier to mark the hash as either a Block hash or `state_root_hash`
+    /// When true, the hash provided is a Block hash.
+    pub is_block_hash: bool,
+    /// The hash value.
+    pub hash_value: &'a str,
+}
+
+impl<'a> TryInto<GlobalStateIdentifier> for GlobalStateStrParams<'a> {
+    type Error = Error;
+
+    fn try_into(self) -> Result<GlobalStateIdentifier> {
+        let hash = Digest::from_hex(self.hash_value).map_err(|error| Error::CryptoError {
+            context: "block_identifier",
+            error,
+        })?;
+
+        if self.is_block_hash {
+            Ok(GlobalStateIdentifier::Block(BlockHash::new(hash)))
+        } else {
+            Ok(GlobalStateIdentifier::StateRoot(hash))
         }
     }
 }

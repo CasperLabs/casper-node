@@ -46,7 +46,7 @@ use crate::{
         AsymmetricKeyExt,
     },
     rpcs::docs::DocExample,
-    types::{Deploy, DeployHash, DeployOrTransferHash, JsonBlock},
+    types::{Deploy, DeployHash, DeployOrTransferHash, JsonBlock, JsonBlockHeader},
     utils::DisplayIter,
 };
 
@@ -161,6 +161,10 @@ static JSON_BLOCK: Lazy<JsonBlock> = Lazy::new(|| {
     block_signature.insert_proof(public_key, signature);
 
     JsonBlock::new(block, Some(block_signature))
+});
+static JSON_BLOCK_HEADER: Lazy<JsonBlockHeader> = Lazy::new(|| {
+    let block_header = Block::doc_example().header().clone();
+    JsonBlockHeader::from(block_header)
 });
 
 /// Error returned from constructing or validating a `Block`.
@@ -1417,9 +1421,10 @@ pub(crate) mod json_compatibility {
         }
     }
 
+    /// JSON representation of a block header.
     #[derive(Serialize, Deserialize, Debug, JsonSchema, Clone, PartialEq, Eq, DataSize)]
     #[serde(deny_unknown_fields)]
-    struct JsonBlockHeader {
+    pub struct JsonBlockHeader {
         parent_hash: BlockHash,
         state_root_hash: Digest,
         body_hash: Digest,
@@ -1463,6 +1468,12 @@ pub(crate) mod json_compatibility {
                 height: block_header.height,
                 protocol_version: block_header.protocol_version,
             }
+        }
+    }
+
+    impl DocExample for JsonBlockHeader {
+        fn doc_example() -> &'static Self {
+            &*JSON_BLOCK_HEADER
         }
     }
 

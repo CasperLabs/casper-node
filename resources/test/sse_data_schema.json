@@ -228,6 +228,7 @@
       "additionalProperties": false
     },
     "JsonBlockHeader": {
+      "description": "JSON representation of a block header.",
       "type": "object",
       "required": [
         "accumulated_seed",

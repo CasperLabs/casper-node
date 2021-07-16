@@ -59,6 +59,8 @@ pub(super) async fn run<REv: ReactorEventT>(
     let rpc_get_state_root_hash =
         rpcs::chain::GetStateRootHash::create_filter(effect_builder, api_version);
     let rpc_get_item = rpcs::state::GetItem::create_filter(effect_builder, api_version);
+    let rpc_query_global_state =
+        rpcs::state::QueryGlobalState::create_filter(effect_builder, api_version);
     let rpc_get_balance = rpcs::state::GetBalance::create_filter(effect_builder, api_version);
     let rpc_get_account_info =
         rpcs::state::GetAccountInfo::create_filter(effect_builder, api_version);
@@ -95,6 +97,7 @@ pub(super) async fn run<REv: ReactorEventT>(
             .or(rpc_get_block_transfers)
             .or(rpc_get_state_root_hash)
             .or(rpc_get_item)
+            .or(rpc_query_global_state)
             .or(rpc_get_balance)
             .or(rpc_get_deploy)
             .or(rpc_get_peers)

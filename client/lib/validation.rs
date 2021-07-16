@@ -9,14 +9,20 @@ use casper_execution_engine::{
 };
 use casper_node::{
     crypto::hash::Digest,
-    rpcs::chain::{BlockIdentifier, EraSummary, GetEraInfoResult},
-    types::{json_compatibility, Block, BlockValidationError, JsonBlock},
+    rpcs::{
+        chain::{BlockIdentifier, EraSummary, GetEraInfoResult},
+        state::GlobalStateIdentifier,
+    },
+    types::{
+        json_compatibility, Block, BlockHeader, BlockValidationError, JsonBlock, JsonBlockHeader,
+    },
 };
 use casper_types::{bytesrepr, Key, U512};
 
 const GET_ITEM_RESULT_BALANCE_VALUE: &str = "balance_value";
 const GET_ITEM_RESULT_STORED_VALUE: &str = "stored_value";
 const GET_ITEM_RESULT_MERKLE_PROOF: &str = "merkle_proof";
+const GLOBAL_STATE_QUERY_BLOCK_HEADER: &str = "block_header";
 
 /// Error that can be returned when validating a block returned from a JSON-RPC method.
 #[derive(Error, Debug)]
@@ -56,6 +62,10 @@ pub enum ValidateResponseError {
     /// Block height was not as requested.
     #[error("block height was not as requested")]
     UnexpectedBlockHeight,
+
+    /// An invalid combination of state identifier and block header response
+    #[error("Invalid combination of State identifier and block header in response")]
+    InvalidGlobalStateResponse,
 }
 
 impl From<bytesrepr::Error> for ValidateResponseError {
@@ -163,6 +173,67 @@ pub(crate) fn validate_query_response(
             _ => return Err(ValidateResponseError::SerializedValueNotContainedInProof),
         }
     }
+
+    core::validate_query_proof(
+        &state_root_hash.to_owned().into(),
+        &proofs,
+        key,
+        path,
+        proof_value,
+    )
+    .map_err(Into::into)
+}
+
+pub(crate) fn validate_global_state_query(
+    response: &JsonRpc,
+    state_identifier: GlobalStateIdentifier,
+    key: &Key,
+    path: &[String],
+) -> Result<(), ValidateResponseError> {
+    let value = response
+        .get_result()
+        .ok_or(ValidateResponseError::ValidateResponseFailedToParse)?;
+
+    let object = value
+        .as_object()
+        .ok_or(ValidateResponseError::ValidateResponseFailedToParse)?;
+
+    let proofs: Vec<TrieMerkleProof<Key, StoredValue>> = {
+        let proof = object
+            .get(GET_ITEM_RESULT_MERKLE_PROOF)
+            .ok_or(ValidateResponseError::ValidateResponseFailedToParse)?;
+        let proof_str = proof
+            .as_str()
+            .ok_or(ValidateResponseError::ValidateResponseFailedToParse)?;
+        let proof_bytes = hex::decode(proof_str)
+            .map_err(|_| ValidateResponseError::ValidateResponseFailedToParse)?;
+        bytesrepr::deserialize(proof_bytes)?
+    };
+
+    let proof_value: &StoredValue = {
+        let last_proof = proofs
+            .last()
+            .ok_or(ValidateResponseError::ValidateResponseFailedToParse)?;
+        last_proof.value()
+    };
+
+    let json_block_header_value = object
+        .get(GLOBAL_STATE_QUERY_BLOCK_HEADER)
+        .ok_or(ValidateResponseError::ValidateResponseFailedToParse)?;
+    let maybe_json_block_header: Option<JsonBlockHeader> =
+        serde_json::from_value(json_block_header_value.to_owned())?;
+
+    let state_root_hash = match (state_identifier, maybe_json_block_header) {
+        (GlobalStateIdentifier::Block(_), None)
+        | (GlobalStateIdentifier::StateRoot(_), Some(_)) => {
+            return Err(ValidateResponseError::InvalidGlobalStateResponse);
+        }
+        (GlobalStateIdentifier::Block(_), Some(json_header)) => {
+            let block_header = BlockHeader::from(json_header);
+            *block_header.state_root_hash()
+        }
+        (GlobalStateIdentifier::StateRoot(hash), None) => hash,
+    };
 
     core::validate_query_proof(
         &state_root_hash.to_owned().into(),

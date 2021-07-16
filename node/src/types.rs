@@ -19,8 +19,9 @@ use rand::{CryptoRng, RngCore};
 use rand_chacha::ChaCha20Rng;
 
 pub use block::{
-    json_compatibility::JsonBlock, Block, BlockBody, BlockHash, BlockHeader, BlockSignatures,
-    BlockValidationError, FinalitySignature,
+    json_compatibility::{JsonBlock, JsonBlockHeader},
+    Block, BlockBody, BlockHash, BlockHeader, BlockSignatures, BlockValidationError,
+    FinalitySignature,
 };
 pub(crate) use block::{BlockByHeight, BlockHeaderWithMetadata, BlockPayload, FinalizedBlock};
 pub(crate) use chainspec::ActivationPoint;
