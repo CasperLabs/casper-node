@@ -50,9 +50,25 @@ void test_should_get_last_error_after_bad_request(void) {
                              error);
 }
 
+void test_keygen_should_work_with_valid_algorithm(void) {
+    casper_error_t success =
+        casper_keygen("./casper_keygen_test", "ed25519", false);
+
+    TEST_ASSERT_EQUAL_INT(CASPER_SUCCESS, success);
+}
+
+void test_keygen_should_fail_with_invalid_algorithm(void) {
+    casper_error_t success =
+        casper_keygen("./casper_keygen_test", "lolwut", false);
+
+    TEST_ASSERT_NOT_EQUAL_INT(CASPER_SUCCESS, success);
+}
+
 int main(int argc, char **argv) {
     UNITY_BEGIN();
     RUN_TEST(test_should_be_no_last_error_on_startup);
     RUN_TEST(test_should_get_last_error_after_bad_request);
+    RUN_TEST(test_keygen_should_work_with_valid_algorithm);
+    RUN_TEST(test_keygen_should_fail_with_invalid_algorithm);
     return UNITY_END();
 }

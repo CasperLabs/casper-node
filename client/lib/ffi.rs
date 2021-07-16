@@ -658,6 +658,22 @@ pub extern "C" fn casper_get_auction_info(
     })
 }
 
+/// Generates key files.
+///
+/// See [super::keygen::generate_files](super::keygen::generate_files) for more details.
+#[no_mangle]
+pub extern "C" fn casper_keygen(
+    output_dir: *const c_char,
+    algorithm: *const c_char,
+    force: bool,
+) -> casper_error_t {
+    let output_dir = try_unsafe_arg!(output_dir);
+    let algorithm = try_unsafe_arg!(algorithm);
+    let result = super::keygen::generate_files(output_dir, algorithm, force);
+    try_unwrap_result!(result);
+    casper_error_t::CASPER_SUCCESS
+}
+
 /// Container for `Deploy` construction options.
 ///
 /// See [DeployStrParams](super::DeployStrParams) for more info.
