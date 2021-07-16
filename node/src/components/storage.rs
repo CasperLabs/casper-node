@@ -364,9 +364,20 @@ impl Storage {
             )?;
 
             let mut body_txn = env.begin_ro_txn()?;
-            let block_body: BlockBody = body_txn
-                .get_value(block_body_v1_db, block_header.body_hash())?
-                .expect("non-existent block body referred to by header");
+            let block_body: BlockBody = match block_header.hashing_algorithm_version() {
+                HashingAlgorithmVersion::V1 => body_txn
+                    .get_value(block_body_v1_db, block_header.body_hash())?
+                    .expect("non-existent block body referred to by header"),
+                HashingAlgorithmVersion::V2 => get_single_block_body_v2(
+                    &mut body_txn,
+                    block_body_v2_db,
+                    deploy_hashes_db,
+                    transfer_hashes_db,
+                    proposer_db,
+                    block_header.body_hash(),
+                )?
+                .expect("non-existent block body referred to by header"),
+            };
 
             if should_check_integrity {
                 Block::new_from_header_and_body(block_header.clone(), block_body.clone())?;
@@ -1646,6 +1657,8 @@ fn get_single_block_body_v2<Tx: Transaction>(
     Ok(Some(block_body))
 }
 
+// TODO: remove once we run the garbage collection again
+#[allow(dead_code)]
 fn garbage_collect_block_body_v2_db(
     txn: &mut RwTransaction,
     block_body_v2_db: &Database,
@@ -1720,24 +1733,13 @@ fn initialize_block_body_v2_db(
 ) -> Result<(), LmdbExtError> {
     info!("initializing v2 block body database");
 
-    let mut txn = env.begin_rw_txn()?;
+    let txn = env.begin_rw_txn()?;
 
     let block_body_hash_to_header_map = if any_v2_block_deleted || should_check_integrity {
         construct_block_body_to_block_header_reverse_lookup(&txn, block_header_db)?
     } else {
         BTreeMap::new()
     };
-
-    if any_v2_block_deleted {
-        garbage_collect_block_body_v2_db(
-            &mut txn,
-            block_body_v2_db,
-            deploy_hashes_db,
-            transfer_hashes_db,
-            proposer_db,
-            &block_body_hash_to_header_map,
-        )?;
-    }
 
     if should_check_integrity {
         let expected_hashing_algorithm_version = HashingAlgorithmVersion::V2;

@@ -1,18 +1,25 @@
 //! Unit tests for the storage component.
 
-use std::{borrow::Cow, collections::HashMap};
+use std::{
+    borrow::Cow,
+    collections::{HashMap, HashSet},
+    convert::TryFrom,
+};
 
-use lmdb::Transaction;
+use lmdb::{Cursor, Transaction};
 use rand::{prelude::SliceRandom, Rng};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use smallvec::smallvec;
 
 use casper_types::{EraId, ExecutionResult, ProtocolVersion, PublicKey, SecretKey};
 
-use super::{Config, Storage};
+use super::{
+    construct_block_body_to_block_header_reverse_lookup, garbage_collect_block_body_v2_db, Config,
+    Storage,
+};
 use crate::{
     components::storage::lmdb_ext::WriteTransactionExt,
-    crypto::AsymmetricKeyExt,
+    crypto::{hash::Digest, AsymmetricKeyExt},
     effect::{
         requests::{StateStoreRequest, StorageRequest},
         Multiple,
@@ -73,6 +80,28 @@ fn storage_fixture_with_hard_reset(
         &WithDir::new(harness.tmp.path(), cfg),
         Some(reset_era_id),
         ProtocolVersion::from_parts(1, 1, 0),
+        false,
+    )
+    .expect("could not create storage component fixture")
+}
+
+/// Storage component test fixture.
+///
+/// Creates a storage component in a temporary directory, but with a hard reset to a specified era.
+///
+/// # Panics
+///
+/// Panics if setting up the storage fixture fails.
+fn storage_fixture_with_hard_reset_and_protocol_version(
+    harness: &ComponentHarness<UnitTestEvent>,
+    reset_era_id: EraId,
+    protocol_version: ProtocolVersion,
+) -> Storage {
+    let cfg = new_config(harness);
+    Storage::new(
+        &WithDir::new(harness.tmp.path(), cfg),
+        Some(reset_era_id),
+        protocol_version,
         false,
     )
     .expect("could not create storage component fixture")
@@ -1151,4 +1180,134 @@ fn should_hard_reset() {
     check(1);
     // Test with a hard reset to era 0, deleting all blocks and associated data.
     check(0);
+}
+
+#[derive(Debug, Clone, PartialEq)]
+struct DatabaseEntriesSnapshot {
+    block_body_keys: HashSet<Digest>,
+    deploy_hashes_keys: HashSet<Digest>,
+    transfer_hashes_keys: HashSet<Digest>,
+    proposer_keys: HashSet<Digest>,
+}
+
+impl DatabaseEntriesSnapshot {
+    fn from_storage(storage: &Storage) -> DatabaseEntriesSnapshot {
+        let txn = storage.env.begin_ro_txn().unwrap();
+
+        let mut cursor = txn.open_ro_cursor(storage.block_body_v2_db).unwrap();
+        let block_body_keys = cursor
+            .iter()
+            .map(|(raw_key, _)| Digest::try_from(raw_key).unwrap())
+            .collect();
+        drop(cursor); // borrow checker complains without this
+
+        let mut cursor = txn.open_ro_cursor(storage.deploy_hashes_db).unwrap();
+        let deploy_hashes_keys = cursor
+            .iter()
+            .map(|(raw_key, _)| Digest::try_from(raw_key).unwrap())
+            .collect();
+        drop(cursor); // borrow checker complains without this
+
+        let mut cursor = txn.open_ro_cursor(storage.transfer_hashes_db).unwrap();
+        let transfer_hashes_keys = cursor
+            .iter()
+            .map(|(raw_key, _)| Digest::try_from(raw_key).unwrap())
+            .collect();
+        drop(cursor); // borrow checker complains without this
+
+        let mut cursor = txn.open_ro_cursor(storage.proposer_db).unwrap();
+        let proposer_keys = cursor
+            .iter()
+            .map(|(raw_key, _)| Digest::try_from(raw_key).unwrap())
+            .collect();
+        drop(cursor); // borrow checker complains without this
+
+        txn.commit().unwrap();
+
+        DatabaseEntriesSnapshot {
+            block_body_keys,
+            deploy_hashes_keys,
+            transfer_hashes_keys,
+            proposer_keys,
+        }
+    }
+}
+
+#[test]
+fn should_garbage_collect() {
+    let blocks_count = 9_usize;
+    let blocks_per_era = 3;
+    let mut harness = ComponentHarness::default();
+    let mut storage = storage_fixture(&harness);
+
+    // Create and store 8 blocks, 0-2 in era 0, 3-5 in era 1, and 6,7 in era 2.
+    let blocks: Vec<Block> = (0..blocks_count)
+        .map(|height| {
+            let is_switch = height % blocks_per_era == blocks_per_era - 1;
+            Block::random_with_specifics(
+                &mut harness.rng,
+                EraId::from((height / blocks_per_era) as u64),
+                height as u64,
+                ProtocolVersion::from_parts(1, 4, 0), // so that they are stored in v2 scheme
+                is_switch,
+            )
+        })
+        .collect();
+
+    let mut snapshots = vec![];
+
+    for block in &blocks {
+        assert!(put_block(
+            &mut harness,
+            &mut storage,
+            Box::new(block.clone())
+        ));
+        // store the storage state after a switch block for later comparison
+        if block.header().is_switch_block() {
+            snapshots.push(DatabaseEntriesSnapshot::from_storage(&storage));
+        }
+    }
+
+    let check = |reset_era: usize| {
+        // Initialize a new storage with a hard reset to the given era, deleting blocks from that
+        // era onwards.
+        let storage = storage_fixture_with_hard_reset_and_protocol_version(
+            &harness,
+            EraId::from(reset_era as u64),
+            ProtocolVersion::from_parts(1, 5, 0), /* this is needed because blocks with later
+                                                   * versions aren't removed on hard resets */
+        );
+
+        // Hard reset should remove headers, but not block bodies
+        let snapshot = DatabaseEntriesSnapshot::from_storage(&storage);
+        assert_eq!(snapshot, snapshots[reset_era]);
+
+        // Run garbage collection
+        let txn = storage.env.begin_ro_txn().unwrap();
+
+        let block_header_map =
+            construct_block_body_to_block_header_reverse_lookup(&txn, &storage.block_header_db)
+                .unwrap();
+        txn.commit().unwrap();
+
+        let mut txn = storage.env.begin_rw_txn().unwrap();
+        garbage_collect_block_body_v2_db(
+            &mut txn,
+            &storage.block_body_v2_db,
+            &storage.deploy_hashes_db,
+            &storage.transfer_hashes_db,
+            &storage.proposer_db,
+            &block_header_map,
+        )
+        .unwrap();
+        txn.commit().unwrap();
+
+        // Garbage collection after removal of blocks from era 2 should revert the state of block
+        // bodies to what it was after era 1.
+        let snapshot = DatabaseEntriesSnapshot::from_storage(&storage);
+        assert_eq!(snapshot, snapshots[reset_era - 1]);
+    };
+
+    check(2);
+    check(1);
 }
