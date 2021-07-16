@@ -187,6 +187,7 @@ impl reactor::Reactor for Reactor {
             None,
             ProtocolVersion::from_parts(1, 0, 0),
             false,
+            "test",
         )
         .unwrap();
 
@@ -195,7 +196,7 @@ impl reactor::Reactor for Reactor {
             Digest::random(rng),
             None,
             ProtocolVersion::from_parts(1, 0, 0),
-            storage_withdir,
+            storage.root_path(),
             &contract_runtime_config,
             registry,
         )

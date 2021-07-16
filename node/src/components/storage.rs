@@ -120,6 +120,13 @@ const OS_FLAGS: EnvironmentFlags = EnvironmentFlags::empty();
 const _STORAGE_EVENT_SIZE: usize = mem::size_of::<Event>();
 const_assert!(_STORAGE_EVENT_SIZE <= 96);
 
+const LMDB_FILES: [&str; 4] = [
+    "data.lmdb",
+    "data.lmdb-lock",
+    "storage.lmdb",
+    "storage.lmdb-lock",
+];
+
 #[derive(Debug, From, Serialize)]
 #[repr(u8)]
 pub enum Event {
@@ -170,6 +177,23 @@ pub enum Error {
     /// LMDB error while operating.
     #[error("internal database error: {0}")]
     InternalStorage(#[from] LmdbExtError),
+
+    /// Filesystem error while trying to move file.
+    #[error("unable to move file {source_path} to {dest_path}: {original_error}")]
+    UnableToMoveFile {
+        /// The path to the file that should have been moved.
+        source_path: PathBuf,
+        /// The path where the file should have been moved to.
+        dest_path: PathBuf,
+        /// The original `io::Error` from `fs::rename`.
+        original_error: io::Error,
+    },
+    /// Mix of missing and found storage files.
+    #[error("expected files to exist: {missing_files:?}.")]
+    MissingStorageFiles {
+        /// The files that were not be found in the storage directory.
+        missing_files: Vec<PathBuf>,
+    },
 }
 
 // We wholesale wrap lmdb errors and treat them as internal errors here.
@@ -260,15 +284,24 @@ impl Storage {
         hard_reset_to_start_of_era: Option<EraId>,
         protocol_version: ProtocolVersion,
         should_check_integrity: bool,
+        network_name: &str,
     ) -> Result<Self, Error> {
         let config = cfg.value();
 
         // Create the database directory.
-        let root = cfg.with_dir(config.path.clone());
-        if !root.exists() {
-            fs::create_dir_all(&root)
-                .map_err(|err| Error::CreateDatabaseDirectory(root.clone(), err))?;
+        let mut root = cfg.with_dir(config.path.clone());
+        let network_subdir = root.join(network_name);
+
+        if !network_subdir.exists() {
+            fs::create_dir_all(&network_subdir)
+                .map_err(|err| Error::CreateDatabaseDirectory(network_subdir.clone(), err))?;
         }
+
+        if should_move_storage_files_to_network_subdir(&root, &LMDB_FILES)? {
+            move_storage_files_to_network_subdir(&root, &network_subdir, &LMDB_FILES)?;
+        }
+
+        root = network_subdir;
 
         // Calculate the upper bound for the memory map that is potentially used.
         let total_size = config
@@ -1160,6 +1193,63 @@ fn insert_to_deploy_index(
         deploy_hash_index.insert(*hash, block_hash);
     }
 
+    Ok(())
+}
+
+fn should_move_storage_files_to_network_subdir(
+    root: &PathBuf,
+    file_names: &[&str],
+) -> Result<bool, Error> {
+    let mut files_found = vec![];
+    let mut files_not_found = vec![];
+
+    file_names.iter().for_each(|file_name| {
+        let file_path = root.join(file_name);
+
+        match file_path.exists() {
+            true => files_found.push(file_path),
+            false => files_not_found.push(file_path),
+        }
+    });
+
+    let should_move_files = files_found.len() == file_names.len();
+
+    if !should_move_files && !files_found.is_empty() {
+        error!(
+            "found storage files: {:?}, missing storage files: {:?}",
+            files_found, files_not_found
+        );
+
+        return Err(Error::MissingStorageFiles {
+            missing_files: files_not_found,
+        });
+    }
+
+    Ok(should_move_files)
+}
+
+fn move_storage_files_to_network_subdir(
+    root: &PathBuf,
+    subdir: &PathBuf,
+    file_names: &[&str],
+) -> Result<(), Error> {
+    file_names
+        .iter()
+        .map(|file_name| {
+            let source_path = root.join(file_name);
+            let dest_path = subdir.join(file_name);
+            fs::rename(&source_path, &dest_path).map_err(|original_error| Error::UnableToMoveFile {
+                source_path,
+                dest_path,
+                original_error,
+            })
+        })
+        .collect::<Result<Vec<_>, Error>>()?;
+
+    info!(
+        "moved files: {:?} from: {:?} to: {:?}",
+        file_names, root, subdir
+    );
     Ok(())
 }
 

@@ -1,6 +1,10 @@
 //! Unit tests for the storage component.
 
-use std::{borrow::Cow, collections::HashMap};
+use std::{
+    borrow::Cow,
+    collections::HashMap,
+    fs::{self, File},
+};
 
 use lmdb::Transaction;
 use rand::{prelude::SliceRandom, Rng};
@@ -9,7 +13,10 @@ use smallvec::smallvec;
 
 use casper_types::{EraId, ExecutionResult, ProtocolVersion, PublicKey, SecretKey};
 
-use super::{Config, Storage};
+use super::{
+    move_storage_files_to_network_subdir, should_move_storage_files_to_network_subdir, Config,
+    Storage,
+};
 use crate::{
     components::storage::lmdb_ext::WriteTransactionExt,
     crypto::AsymmetricKeyExt,
@@ -54,6 +61,7 @@ fn storage_fixture(harness: &ComponentHarness<UnitTestEvent>) -> Storage {
         None,
         ProtocolVersion::from_parts(1, 0, 0),
         false,
+        "test",
     )
     .expect("could not create storage component fixture")
 }
@@ -75,6 +83,7 @@ fn storage_fixture_with_hard_reset(
         Some(reset_era_id),
         ProtocolVersion::from_parts(1, 1, 0),
         false,
+        "test",
     )
     .expect("could not create storage component fixture")
 }
@@ -1151,4 +1160,112 @@ fn should_hard_reset() {
     check(1);
     // Test with a hard reset to era 0, deleting all blocks and associated data.
     check(0);
+}
+
+#[test]
+fn should_create_subdir_named_after_network() {
+    let harness = ComponentHarness::default();
+    let cfg = new_config(&harness);
+
+    let storage = Storage::new(
+        &WithDir::new(harness.tmp.path(), cfg.clone()),
+        None,
+        ProtocolVersion::from_parts(1, 0, 0),
+        false,
+        "test",
+    )
+    .unwrap();
+
+    let expected_path = cfg.path.join("test");
+
+    assert!(expected_path.exists());
+    assert_eq!(expected_path, storage.root_path());
+}
+
+#[test]
+fn should_not_try_to_move_nonexistent_files() {
+    let harness = ComponentHarness::default();
+    let cfg = new_config(&harness);
+    let file_names = ["temp.txt"];
+
+    let actual = should_move_storage_files_to_network_subdir(&cfg.path, &file_names).unwrap();
+
+    assert_eq!(false, actual);
+}
+
+#[test]
+fn should_move_files_if_they_exist() {
+    let harness = ComponentHarness::default();
+    let cfg = new_config(&harness);
+    let file_names = ["temp1.txt", "temp2.txt", "temp3.txt"];
+
+    // Storage will create this in the constructor,
+    // doing this manually since we're not calling the constructor in this test.
+    fs::create_dir(cfg.path.clone()).unwrap();
+
+    // create empty files for testing.
+    File::create(cfg.path.join(file_names[0])).unwrap();
+    File::create(cfg.path.join(file_names[1])).unwrap();
+    File::create(cfg.path.join(file_names[2])).unwrap();
+
+    let actual = should_move_storage_files_to_network_subdir(&cfg.path, &file_names).unwrap();
+
+    assert_eq!(true, actual);
+}
+
+#[test]
+fn should_return_error_if_files_missing() {
+    let harness = ComponentHarness::default();
+    let cfg = new_config(&harness);
+    let file_names = ["temp1.txt", "temp2.txt", "temp3.txt"];
+
+    // Storage will create this in the constructor,
+    // doing this manually since we're not calling the constructor in this test.
+    fs::create_dir(cfg.path.clone()).unwrap();
+
+    // create empty files for testing, but not all of the files.
+    File::create(cfg.path.join(file_names[1])).unwrap();
+    File::create(cfg.path.join(file_names[2])).unwrap();
+
+    let actual = should_move_storage_files_to_network_subdir(&cfg.path, &file_names);
+
+    assert!(actual.is_err());
+}
+
+#[test]
+fn should_actually_move_specified_files() {
+    let harness = ComponentHarness::default();
+    let cfg = new_config(&harness);
+    let file_names = ["temp1.txt", "temp2.txt", "temp3.txt"];
+    let root = cfg.path;
+    let subdir = root.join("test");
+    let src_path1 = root.join(file_names[0]);
+    let src_path2 = root.join(file_names[1]);
+    let src_path3 = root.join(file_names[2]);
+    let dest_path1 = subdir.join(file_names[0]);
+    let dest_path2 = subdir.join(file_names[1]);
+    let dest_path3 = subdir.join(file_names[2]);
+
+    // Storage will create this in the constructor,
+    // doing this manually since we're not calling the constructor in this test.
+    fs::create_dir_all(subdir.clone()).unwrap();
+
+    // create empty files for testing.
+    File::create(src_path1.clone()).unwrap();
+    File::create(src_path2.clone()).unwrap();
+    File::create(src_path3.clone()).unwrap();
+
+    assert!(src_path1.exists());
+    assert!(src_path2.exists());
+    assert!(src_path3.exists());
+
+    let result = move_storage_files_to_network_subdir(&root, &subdir, &file_names);
+
+    assert!(result.is_ok());
+    assert!(!src_path1.exists());
+    assert!(!src_path2.exists());
+    assert!(!src_path3.exists());
+    assert!(dest_path1.exists());
+    assert!(dest_path2.exists());
+    assert!(dest_path3.exists());
 }

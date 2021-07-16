@@ -6,6 +6,7 @@ mod types;
 use std::{
     collections::{BTreeMap, HashMap, VecDeque},
     fmt::{self, Debug, Formatter},
+    path::Path,
     sync::Arc,
     time::Instant,
 };
@@ -51,8 +52,7 @@ use crate::{
         Block, BlockHash, BlockHeader, Chainspec, Deploy, DeployHash, DeployHeader, FinalizedBlock,
         NodeId,
     },
-    utils::WithDir,
-    NodeRng, StorageConfig,
+    NodeRng,
 };
 
 /// Contract runtime component event.
@@ -656,14 +656,13 @@ impl ContractRuntime {
         initial_state_root_hash: Digest,
         initial_block_header: Option<&BlockHeader>,
         protocol_version: ProtocolVersion,
-        storage_config: WithDir<StorageConfig>,
+        storage_dir: &Path,
         contract_runtime_config: &Config,
         registry: &Registry,
     ) -> Result<Self, ConfigError> {
         let initial_state = InitialState::new(initial_state_root_hash, initial_block_header);
-        let path = storage_config.with_dir(storage_config.value().path.clone());
         let environment = Arc::new(LmdbEnvironment::new(
-            path.as_path(),
+            storage_dir,
             contract_runtime_config.max_global_state_size(),
             contract_runtime_config.max_readers(),
         )?);
