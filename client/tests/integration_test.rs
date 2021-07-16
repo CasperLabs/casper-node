@@ -4,7 +4,7 @@ use futures::{channel::oneshot, future};
 use hyper::{Body, Response, Server};
 use serde::Deserialize;
 use tempfile::TempDir;
-use tokio::{sync::Mutex, task, task::JoinHandle};
+use tokio::{sync::Mutex, task::JoinHandle};
 use tower::builder::ServiceBuilder;
 use warp::{Filter, Rejection};
 use warp_json_rpc::Builder;
@@ -119,42 +119,52 @@ impl MockServerHandle {
         }
     }
 
-    fn get_balance(&self, state_root_hash: &str, purse_uref: &str) -> Result<(), ErrWrapper> {
+    async fn get_balance(&self, state_root_hash: &str, purse_uref: &str) -> Result<(), ErrWrapper> {
         casper_client::get_balance("1", &self.url(), 0, state_root_hash, purse_uref)
+            .await
             .map(|_| ())
             .map_err(ErrWrapper)
     }
 
-    fn get_deploy(&self, deploy_hash: &str) -> Result<(), ErrWrapper> {
+    async fn get_deploy(&self, deploy_hash: &str) -> Result<(), ErrWrapper> {
         casper_client::get_deploy("1", &self.url(), 0, deploy_hash)
+            .await
             .map(|_| ())
             .map_err(ErrWrapper)
     }
 
-    fn get_state_root_hash(&self, maybe_block_id: &str) -> Result<(), ErrWrapper> {
+    async fn get_state_root_hash(&self, maybe_block_id: &str) -> Result<(), ErrWrapper> {
         casper_client::get_state_root_hash("1", &self.url(), 0, maybe_block_id)
+            .await
             .map(|_| ())
             .map_err(ErrWrapper)
     }
 
-    fn get_block(&self, maybe_block_id: &str) -> Result<(), ErrWrapper> {
+    async fn get_block(&self, maybe_block_id: &str) -> Result<(), ErrWrapper> {
         casper_client::get_block("1", &self.url(), 0, maybe_block_id)
+            .await
             .map(|_| ())
             .map_err(ErrWrapper)
     }
 
-    fn get_item(&self, state_root_hash: &str, key: &str, path: &str) -> Result<(), ErrWrapper> {
+    async fn get_item(
+        &self,
+        state_root_hash: &str,
+        key: &str,
+        path: &str,
+    ) -> Result<(), ErrWrapper> {
         casper_client::get_item("1", &self.url(), 0, state_root_hash, key, path)
+            .await
             .map(|_| ())
             .map_err(ErrWrapper)
     }
 
-    fn transfer(
+    async fn transfer(
         &self,
         amount: &str,
         maybe_target_account: &str,
-        deploy_params: DeployStrParams,
-        payment_params: PaymentStrParams,
+        deploy_params: DeployStrParams<'_>,
+        payment_params: PaymentStrParams<'_>,
     ) -> Result<(), ErrWrapper> {
         casper_client::transfer(
             "1",
@@ -166,15 +176,16 @@ impl MockServerHandle {
             deploy_params,
             payment_params,
         )
+        .await
         .map(|_| ())
         .map_err(ErrWrapper)
     }
 
-    fn put_deploy(
+    async fn put_deploy(
         &self,
-        deploy_params: DeployStrParams,
-        session_params: SessionStrParams,
-        payment_params: PaymentStrParams,
+        deploy_params: DeployStrParams<'_>,
+        session_params: SessionStrParams<'_>,
+        payment_params: PaymentStrParams<'_>,
     ) -> Result<(), ErrWrapper> {
         casper_client::put_deploy(
             "1",
@@ -184,18 +195,21 @@ impl MockServerHandle {
             session_params,
             payment_params,
         )
+        .await
         .map(|_| ())
         .map_err(ErrWrapper)
     }
 
-    fn send_deploy_file(&self, input_path: &str) -> Result<(), ErrWrapper> {
+    async fn send_deploy_file(&self, input_path: &str) -> Result<(), ErrWrapper> {
         casper_client::send_deploy_file("1", &self.url(), 0, input_path)
+            .await
             .map(|_| ())
             .map_err(ErrWrapper)
     }
 
-    fn get_auction_info(&self, maybe_block_id: &str) -> Result<(), ErrWrapper> {
+    async fn get_auction_info(&self, maybe_block_id: &str) -> Result<(), ErrWrapper> {
         casper_client::get_auction_info("1", &self.url(), 0, maybe_block_id)
+            .await
             .map(|_| ())
             .map_err(ErrWrapper)
     }
@@ -284,7 +298,9 @@ mod get_balance {
     async fn should_succeed_with_valid_arguments() {
         let server_handle = MockServerHandle::spawn::<GetBalanceParams>(GetBalance::METHOD);
         assert_eq!(
-            server_handle.get_balance(VALID_STATE_ROOT_HASH, VALID_PURSE_UREF),
+            server_handle
+                .get_balance(VALID_STATE_ROOT_HASH, VALID_PURSE_UREF)
+                .await,
             // NOTE: this "success" means that we then fail to validate the response, but that
             // is outside the scope of this test.
             // The MockServerHandle could support a pre-baked response, which should successfully
@@ -299,7 +315,7 @@ mod get_balance {
     async fn should_fail_with_empty_arguments() {
         let server_handle = MockServerHandle::spawn::<GetBalanceParams>(GetBalance::METHOD);
         assert_eq!(
-            server_handle.get_balance("", ""),
+            server_handle.get_balance("", "").await,
             Err(Error::CryptoError {
                 context: "state_root_hash",
                 error: CryptoError::FromHex(FromHexError::InvalidStringLength)
@@ -312,7 +328,7 @@ mod get_balance {
     async fn should_fail_with_empty_state_root_hash() {
         let server_handle = MockServerHandle::spawn::<GetBalanceParams>(GetBalance::METHOD);
         assert_eq!(
-            server_handle.get_balance("", VALID_PURSE_UREF),
+            server_handle.get_balance("", VALID_PURSE_UREF).await,
             Err(Error::CryptoError {
                 context: "state_root_hash",
                 error: CryptoError::FromHex(FromHexError::InvalidStringLength)
@@ -325,7 +341,7 @@ mod get_balance {
     async fn should_fail_with_empty_purse_uref() {
         let server_handle = MockServerHandle::spawn::<GetBalanceParams>(GetBalance::METHOD);
         assert_eq!(
-            server_handle.get_balance(VALID_STATE_ROOT_HASH, ""),
+            server_handle.get_balance(VALID_STATE_ROOT_HASH, "").await,
             Err(Error::FailedToParseURef("purse_uref", URefFromStrError::InvalidPrefix).into())
         );
     }
@@ -334,7 +350,9 @@ mod get_balance {
     async fn should_fail_with_bad_state_root_hash() {
         let server_handle = MockServerHandle::spawn::<GetBalanceParams>(GetBalance::METHOD);
         assert_eq!(
-            server_handle.get_balance("deadbeef", VALID_PURSE_UREF),
+            server_handle
+                .get_balance("deadbeef", VALID_PURSE_UREF)
+                .await,
             Err(Error::CryptoError {
                 context: "state_root_hash",
                 error: CryptoError::FromHex(FromHexError::InvalidStringLength)
@@ -352,9 +370,11 @@ mod get_state_root_hash {
         let server_handle =
             MockServerHandle::spawn::<GetStateRootHashParams>(GetStateRootHash::METHOD);
         assert_eq!(
-            server_handle.get_state_root_hash(
-                "7a073a340bb5e0ca60f4c1dbb3254fb0641da79cda7c5aeb5303efa74fcc9eb1",
-            ),
+            server_handle
+                .get_state_root_hash(
+                    "7a073a340bb5e0ca60f4c1dbb3254fb0641da79cda7c5aeb5303efa74fcc9eb1",
+                )
+                .await,
             Ok(())
         );
     }
@@ -362,13 +382,13 @@ mod get_state_root_hash {
     #[tokio::test(flavor = "multi_thread")]
     async fn should_succeed_with_empty_block_id() {
         let server_handle = MockServerHandle::spawn_without_params(GetStateRootHash::METHOD);
-        assert_eq!(server_handle.get_state_root_hash(""), Ok(()));
+        assert_eq!(server_handle.get_state_root_hash("").await, Ok(()));
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn should_succeed_with_valid_block_height() {
         let server_handle = MockServerHandle::spawn_without_params(GetStateRootHash::METHOD);
-        assert_eq!(server_handle.get_state_root_hash("1"), Ok(()));
+        assert_eq!(server_handle.get_state_root_hash("1").await, Ok(()));
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -376,7 +396,7 @@ mod get_state_root_hash {
         let server_handle = MockServerHandle::spawn_without_params(GetStateRootHash::METHOD);
         let input = "<not a real block id>";
         assert!(
-            server_handle.get_state_root_hash(input).is_err(),
+            server_handle.get_state_root_hash(input).await.is_err(),
             "input '{}' should not parse to a valid block id",
             input
         );
@@ -396,7 +416,7 @@ mod get_block {
     async fn should_succeed_with_valid_block_hash() {
         let server_handle = MockServerHandle::spawn::<GetBlockParams>(GetBlock::METHOD);
         assert_eq!(
-            server_handle.get_block(VALID_STATE_ROOT_HASH),
+            server_handle.get_block(VALID_STATE_ROOT_HASH).await,
             Err(ErrWrapper(Error::InvalidResponse(
                 ValidateResponseError::NoBlockInResponse
             )))
@@ -407,7 +427,7 @@ mod get_block {
     async fn should_succeed_with_valid_block_height() {
         let server_handle = MockServerHandle::spawn::<GetBlockParams>(GetBlock::METHOD);
         assert_eq!(
-            server_handle.get_block("1"),
+            server_handle.get_block("1").await,
             Err(ErrWrapper(Error::InvalidResponse(
                 ValidateResponseError::NoBlockInResponse
             )))
@@ -418,7 +438,7 @@ mod get_block {
     async fn should_succeed_with_valid_empty_block_hash() {
         let server_handle = MockServerHandle::spawn_without_params(GetBlock::METHOD);
         assert_eq!(
-            server_handle.get_block(""),
+            server_handle.get_block("").await,
             Err(ErrWrapper(Error::InvalidResponse(
                 ValidateResponseError::NoBlockInResponse
             )))
@@ -428,7 +448,7 @@ mod get_block {
     #[tokio::test(flavor = "multi_thread")]
     async fn should_fail_with_invalid_block_id() {
         let server_handle = MockServerHandle::spawn::<GetBlockParams>(GetBlock::METHOD);
-        match server_handle.get_block("<not a valid hash>") {
+        match server_handle.get_block("<not a valid hash>").await {
             Err(ErrWrapper(Error::FailedToParseInt("block_identifier", _))) => {}
             other => panic!("incorrect error returned from client {:?}", other),
         }
@@ -449,7 +469,9 @@ mod get_item {
         // mock implementation fails to validate
 
         assert_eq!(
-            server_handle.get_item(VALID_STATE_ROOT_HASH, VALID_PURSE_UREF, ""),
+            server_handle
+                .get_item(VALID_STATE_ROOT_HASH, VALID_PURSE_UREF, "")
+                .await,
             Err(
                 Error::InvalidResponse(ValidateResponseError::ValidateResponseFailedToParse).into()
             )
@@ -460,7 +482,9 @@ mod get_item {
     async fn should_fail_with_invalid_state_root_hash() {
         let server_handle = MockServerHandle::spawn::<GetItemParams>(GetItem::METHOD);
         assert_eq!(
-            server_handle.get_item("<invalid state root hash>", VALID_PURSE_UREF, ""),
+            server_handle
+                .get_item("<invalid state root hash>", VALID_PURSE_UREF, "")
+                .await,
             Err(Error::CryptoError {
                 context: "state_root_hash",
                 error: CryptoError::FromHex(FromHexError::OddLength)
@@ -473,7 +497,9 @@ mod get_item {
     async fn should_fail_with_invalid_key() {
         let server_handle = MockServerHandle::spawn::<GetItemParams>(GetItem::METHOD);
         assert_eq!(
-            server_handle.get_item(VALID_STATE_ROOT_HASH, "invalid key", ""),
+            server_handle
+                .get_item(VALID_STATE_ROOT_HASH, "invalid key", "")
+                .await,
             Err(Error::FailedToParseKey.into())
         );
     }
@@ -482,7 +508,9 @@ mod get_item {
     async fn should_fail_with_empty_key() {
         let server_handle = MockServerHandle::spawn::<GetItemParams>(GetItem::METHOD);
         assert_eq!(
-            server_handle.get_item("<invalid state root hash>", "", ""),
+            server_handle
+                .get_item("<invalid state root hash>", "", "")
+                .await,
             Err(Error::CryptoError {
                 context: "state_root_hash",
                 error: CryptoError::FromHex(FromHexError::OddLength)
@@ -500,7 +528,8 @@ mod get_deploy {
         let server_handle = MockServerHandle::spawn::<GetDeployParams>(GetDeploy::METHOD);
         assert_eq!(
             server_handle
-                .get_deploy("09dcee4b212cfd53642ab323fbef07dafafc6f945a80a00147f62910a915c4e6"),
+                .get_deploy("09dcee4b212cfd53642ab323fbef07dafafc6f945a80a00147f62910a915c4e6")
+                .await,
             Ok(())
         );
     }
@@ -509,7 +538,7 @@ mod get_deploy {
     async fn should_fail_with_invalid_hash() {
         let server_handle = MockServerHandle::spawn::<GetDeployParams>(GetDeploy::METHOD);
         assert_eq!(
-            server_handle.get_deploy("012345",),
+            server_handle.get_deploy("012345",).await,
             Err(Error::CryptoError {
                 context: "deploy_hash",
                 error: CryptoError::FromHex(FromHexError::InvalidStringLength)
@@ -527,7 +556,7 @@ mod get_auction_info {
     #[tokio::test(flavor = "multi_thread")]
     async fn should_succeed() {
         let server_handle = MockServerHandle::spawn_without_params(GetAuctionInfo::METHOD);
-        assert_eq!(server_handle.get_auction_info(""), Ok(()));
+        assert_eq!(server_handle.get_auction_info("").await, Ok(()));
     }
 }
 
@@ -624,7 +653,7 @@ mod send_deploy {
     async fn should_fail_with_bad_deploy_file_path() {
         let server_handle = MockServerHandle::spawn::<PutDeployParams>(PutDeploy::METHOD);
         if let Err(ErrWrapper(Error::IoError { context, .. })) =
-            server_handle.send_deploy_file("<not a valid path>")
+            server_handle.send_deploy_file("<not a valid path>").await
         {
             assert_eq!(context, "unable to read input file \'<not a valid path>\'")
         }
@@ -648,7 +677,9 @@ mod send_deploy {
         );
         let server_handle = MockServerHandle::spawn::<PutDeployParams>(PutDeploy::METHOD);
         assert_eq!(
-            server_handle.send_deploy_file(file_path.to_str().unwrap()),
+            server_handle
+                .send_deploy_file(file_path.to_str().unwrap())
+                .await,
             Ok(())
         );
     }
@@ -1028,11 +1059,13 @@ mod put_deploy {
     async fn should_send_put_deploy() {
         let server_handle = MockServerHandle::spawn::<PutDeployParams>(PutDeploy::METHOD);
         assert_eq!(
-            server_handle.put_deploy(
-                deploy_params::test_data_valid(),
-                session_params::test_data_with_package_hash(),
-                payment_params::test_data_with_name()
-            ),
+            server_handle
+                .put_deploy(
+                    deploy_params::test_data_valid(),
+                    session_params::test_data_with_package_hash(),
+                    payment_params::test_data_with_name()
+                )
+                .await,
             Ok(())
         );
     }
@@ -1056,20 +1089,19 @@ mod rate_limit {
             let maybe_target_account =
                 "01522ef6c89038019cb7af05c340623804392dd2bb1f4dab5e4a9c3ab752fc0179";
 
-            // If you remove the tokio::task::spawn_blocking call wrapping the call to transfer, the
-            // client will eventually eat all executor threads and deadlock (at 64 consecutive
-            // requests). I believe this is happening because the server is executing on the same
-            // tokio runtime as the client.
             let server_handle = server_handle.clone();
-            let join_handle = task::spawn_blocking(move || {
-                server_handle.transfer(
-                    amount,
-                    maybe_target_account,
-                    deploy_params::test_data_valid(),
-                    payment_params::test_data_with_name(),
-                )
-            });
-            assert_eq!(join_handle.await.unwrap(), Ok(()));
+
+            assert_eq!(
+                server_handle
+                    .transfer(
+                        amount,
+                        maybe_target_account,
+                        deploy_params::test_data_valid(),
+                        payment_params::test_data_with_name(),
+                    )
+                    .await,
+                Ok(())
+            );
         }
 
         let diff = now.elapsed();
@@ -1097,12 +1129,14 @@ mod transfer {
         let maybe_target_account =
             "01522ef6c89038019cb7af05c340623804392dd2bb1f4dab5e4a9c3ab752fc0179";
         assert_eq!(
-            server_handle.transfer(
-                amount,
-                maybe_target_account,
-                deploy_params::test_data_valid(),
-                payment_params::test_data_with_name()
-            ),
+            server_handle
+                .transfer(
+                    amount,
+                    maybe_target_account,
+                    deploy_params::test_data_valid(),
+                    payment_params::test_data_with_name()
+                )
+                .await,
             Ok(())
         );
     }

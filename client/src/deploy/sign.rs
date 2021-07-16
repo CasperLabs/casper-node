@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use clap::{App, ArgMatches, SubCommand};
 
 use casper_client::Error;
@@ -7,6 +8,7 @@ use crate::{command::ClientCommand, common, Success};
 
 pub struct SignDeploy;
 
+#[async_trait]
 impl<'a, 'b> ClientCommand<'a, 'b> for SignDeploy {
     const NAME: &'static str = "sign-deploy";
     const ABOUT: &'static str =
@@ -28,7 +30,7 @@ impl<'a, 'b> ClientCommand<'a, 'b> for SignDeploy {
             ))
     }
 
-    fn run(matches: &ArgMatches<'_>) -> Result<Success, Error> {
+    async fn run(matches: &ArgMatches<'a>) -> Result<Success, Error> {
         let input_path = creation_common::input::get(matches);
         let secret_key = common::secret_key::get(matches);
         let maybe_output_path = creation_common::output::get(matches).unwrap_or_default();

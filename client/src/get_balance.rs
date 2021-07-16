@@ -1,5 +1,6 @@
 use std::str;
 
+use async_trait::async_trait;
 use clap::{App, Arg, ArgMatches, SubCommand};
 
 use casper_client::Error;
@@ -44,6 +45,7 @@ mod purse_uref {
     }
 }
 
+#[async_trait]
 impl<'a, 'b> ClientCommand<'a, 'b> for GetBalance {
     const NAME: &'static str = "get-balance";
     const ABOUT: &'static str = "Retrieves a purse's balance from the network";
@@ -63,7 +65,7 @@ impl<'a, 'b> ClientCommand<'a, 'b> for GetBalance {
             .arg(purse_uref::arg())
     }
 
-    fn run(matches: &ArgMatches<'_>) -> Result<Success, Error> {
+    async fn run(matches: &ArgMatches<'a>) -> Result<Success, Error> {
         let maybe_rpc_id = common::rpc_id::get(matches);
         let node_address = common::node_address::get(matches);
         let verbosity_level = common::verbose::get(matches);
@@ -77,6 +79,7 @@ impl<'a, 'b> ClientCommand<'a, 'b> for GetBalance {
             state_root_hash,
             purse_uref,
         )
+        .await
         .map(Success::from)
     }
 }

@@ -1,5 +1,6 @@
 use std::str;
 
+use async_trait::async_trait;
 use clap::{App, ArgMatches, SubCommand};
 
 use casper_client::Error;
@@ -15,6 +16,7 @@ enum DisplayOrder {
     BlockHash,
 }
 
+#[async_trait]
 impl<'a, 'b> ClientCommand<'a, 'b> for GetStateRootHash {
     const NAME: &'static str = "get-state-root-hash";
     const ABOUT: &'static str = "Retrieves a state root hash at a given block";
@@ -33,7 +35,7 @@ impl<'a, 'b> ClientCommand<'a, 'b> for GetStateRootHash {
             ))
     }
 
-    fn run(matches: &ArgMatches<'_>) -> Result<Success, Error> {
+    async fn run(matches: &ArgMatches<'a>) -> Result<Success, Error> {
         let maybe_rpc_id = common::rpc_id::get(matches);
         let node_address = common::node_address::get(matches);
         let verbosity_level = common::verbose::get(matches);
@@ -45,6 +47,7 @@ impl<'a, 'b> ClientCommand<'a, 'b> for GetStateRootHash {
             verbosity_level,
             maybe_block_id,
         )
+        .await
         .map(Success::from)
     }
 }

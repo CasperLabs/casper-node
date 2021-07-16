@@ -1,5 +1,6 @@
 use std::str;
 
+use async_trait::async_trait;
 use clap::{App, ArgMatches, SubCommand};
 
 use casper_client::{Error, ListDeploysResult};
@@ -17,6 +18,7 @@ enum DisplayOrder {
 
 pub struct ListDeploys;
 
+#[async_trait]
 impl<'a, 'b> ClientCommand<'a, 'b> for ListDeploys {
     const NAME: &'static str = "list-deploys";
     const ABOUT: &'static str = "Retrieves the list of all deploy hashes in a given block";
@@ -35,14 +37,15 @@ impl<'a, 'b> ClientCommand<'a, 'b> for ListDeploys {
             ))
     }
 
-    fn run(matches: &ArgMatches<'_>) -> Result<Success, Error> {
+    async fn run(matches: &ArgMatches<'a>) -> Result<Success, Error> {
         let maybe_rpc_id = common::rpc_id::get(matches);
         let node_address = common::node_address::get(matches);
         let verbosity_level = common::verbose::get(matches);
         let maybe_block_id = common::block_identifier::get(matches);
 
         let result =
-            casper_client::get_block(maybe_rpc_id, node_address, verbosity_level, maybe_block_id);
+            casper_client::get_block(maybe_rpc_id, node_address, verbosity_level, maybe_block_id)
+                .await;
 
         result.map(|response| {
             let response_value = response.get_result().cloned().unwrap();

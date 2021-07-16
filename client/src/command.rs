@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use clap::{App, ArgMatches};
 use jsonrpc_lite::JsonRpc;
 
@@ -17,11 +18,13 @@ impl From<JsonRpc> for Success {
     }
 }
 
+#[async_trait]
 pub trait ClientCommand<'a, 'b> {
     const NAME: &'static str;
     const ABOUT: &'static str;
     /// Constructs the clap `SubCommand` and returns the clap `App`.
     fn build(display_order: usize) -> App<'a, 'b>;
+
     /// Parses the arg matches and runs the subcommand.
-    fn run(matches: &ArgMatches<'_>) -> Result<Success, Error>;
+    async fn run(matches: &ArgMatches<'a>) -> Result<Success, Error>;
 }

@@ -1,5 +1,6 @@
 use std::{fs::File, path::PathBuf, process, str::FromStr};
 
+use async_trait::async_trait;
 use clap::{crate_name, App, Arg, ArgMatches, Shell, SubCommand};
 
 use casper_client::Error;
@@ -79,6 +80,7 @@ mod shell {
 
 pub struct GenerateCompletion {}
 
+#[async_trait]
 impl<'a, 'b> ClientCommand<'a, 'b> for GenerateCompletion {
     const NAME: &'static str = "generate-completion";
     const ABOUT: &'static str = "Generates a shell completion script";
@@ -92,7 +94,7 @@ impl<'a, 'b> ClientCommand<'a, 'b> for GenerateCompletion {
             .arg(shell::arg())
     }
 
-    fn run(matches: &ArgMatches<'_>) -> Result<Success, Error> {
+    async fn run(matches: &ArgMatches<'a>) -> Result<Success, Error> {
         let output_path = output_file::get(matches);
         let force = common::force::get(matches);
         let shell = shell::get(matches);

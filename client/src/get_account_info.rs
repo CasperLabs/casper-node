@@ -1,5 +1,6 @@
 use std::str;
 
+use async_trait::async_trait;
 use clap::{App, ArgMatches, SubCommand};
 
 use casper_client::Error;
@@ -16,6 +17,7 @@ enum DisplayOrder {
     BlockIdentifier,
 }
 
+#[async_trait]
 impl<'a, 'b> ClientCommand<'a, 'b> for GetAccountInfo {
     const NAME: &'static str = "get-account-info";
     const ABOUT: &'static str = "Retrieve account information from the network";
@@ -35,7 +37,7 @@ impl<'a, 'b> ClientCommand<'a, 'b> for GetAccountInfo {
             ))
     }
 
-    fn run(matches: &ArgMatches<'_>) -> Result<Success, Error> {
+    async fn run(matches: &ArgMatches<'a>) -> Result<Success, Error> {
         let maybe_rpc_id = common::rpc_id::get(matches);
         let node_address = common::node_address::get(matches);
         let verbosity_level = common::verbose::get(matches);
@@ -49,6 +51,7 @@ impl<'a, 'b> ClientCommand<'a, 'b> for GetAccountInfo {
             &public_key,
             block_identifier,
         )
+        .await
         .map(Success::from)
     }
 }

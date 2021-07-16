@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use std::str;
 
 use clap::{App, ArgMatches, SubCommand};
@@ -15,6 +16,7 @@ enum DisplayOrder {
 
 pub struct GenerateAccountHash {}
 
+#[async_trait]
 impl<'a, 'b> ClientCommand<'a, 'b> for GenerateAccountHash {
     const NAME: &'static str = "account-address";
     const ABOUT: &'static str = "Generates an account hash from a given public key";
@@ -27,7 +29,7 @@ impl<'a, 'b> ClientCommand<'a, 'b> for GenerateAccountHash {
             .arg(common::public_key::arg(DisplayOrder::PublicKey as usize))
     }
 
-    fn run(matches: &ArgMatches<'_>) -> Result<Success, Error> {
+    async fn run(matches: &ArgMatches<'a>) -> Result<Success, Error> {
         let hex_public_key = common::public_key::get(matches)?;
         let public_key = PublicKey::from_hex(&hex_public_key).map_err(|error| {
             eprintln!("Can't parse {} as a public key: {}", hex_public_key, error);

@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use clap::{App, Arg, ArgMatches, SubCommand};
 use once_cell::sync::Lazy;
 
@@ -79,6 +80,7 @@ mod algorithm {
 
 pub struct Keygen {}
 
+#[async_trait]
 impl<'a, 'b> ClientCommand<'a, 'b> for Keygen {
     const NAME: &'static str = "keygen";
     const ABOUT: &'static str = "Generates account key files in the given directory";
@@ -93,7 +95,7 @@ impl<'a, 'b> ClientCommand<'a, 'b> for Keygen {
             .arg(algorithm::arg())
     }
 
-    fn run(matches: &ArgMatches<'_>) -> Result<Success, Error> {
+    async fn run(matches: &ArgMatches<'a>) -> Result<Success, Error> {
         let output_dir = output_dir::get(matches);
         let algorithm = algorithm::get(matches);
         let force = common::force::get(matches);

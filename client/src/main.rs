@@ -96,28 +96,32 @@ fn cli<'a, 'b>() -> App<'a, 'b> {
 async fn main() {
     let arg_matches = cli().get_matches();
     let (result, matches) = match arg_matches.subcommand() {
-        (PutDeploy::NAME, Some(matches)) => (PutDeploy::run(matches), matches),
-        (MakeDeploy::NAME, Some(matches)) => (MakeDeploy::run(matches), matches),
-        (SignDeploy::NAME, Some(matches)) => (SignDeploy::run(matches), matches),
-        (SendDeploy::NAME, Some(matches)) => (SendDeploy::run(matches), matches),
-        (Transfer::NAME, Some(matches)) => (Transfer::run(matches), matches),
-        (MakeTransfer::NAME, Some(matches)) => (MakeTransfer::run(matches), matches),
-        (GetDeploy::NAME, Some(matches)) => (GetDeploy::run(matches), matches),
-        (GetBlock::NAME, Some(matches)) => (GetBlock::run(matches), matches),
-        (GetBlockTransfers::NAME, Some(matches)) => (GetBlockTransfers::run(matches), matches),
-        (ListDeploys::NAME, Some(matches)) => (ListDeploys::run(matches), matches),
-        (GetBalance::NAME, Some(matches)) => (GetBalance::run(matches), matches),
-        (GetAccountInfo::NAME, Some(matches)) => (GetAccountInfo::run(matches), matches),
-        (GetStateRootHash::NAME, Some(matches)) => (GetStateRootHash::run(matches), matches),
-        (QueryState::NAME, Some(matches)) => (QueryState::run(matches), matches),
-        (GetEraInfoBySwitchBlock::NAME, Some(matches)) => {
-            (GetEraInfoBySwitchBlock::run(matches), matches)
+        (PutDeploy::NAME, Some(matches)) => (PutDeploy::run(matches).await, matches),
+        (MakeDeploy::NAME, Some(matches)) => (MakeDeploy::run(matches).await, matches),
+        (SignDeploy::NAME, Some(matches)) => (SignDeploy::run(matches).await, matches),
+        (SendDeploy::NAME, Some(matches)) => (SendDeploy::run(matches).await, matches),
+        (Transfer::NAME, Some(matches)) => (Transfer::run(matches).await, matches),
+        (MakeTransfer::NAME, Some(matches)) => (MakeTransfer::run(matches).await, matches),
+        (GetDeploy::NAME, Some(matches)) => (GetDeploy::run(matches).await, matches),
+        (GetBlock::NAME, Some(matches)) => (GetBlock::run(matches).await, matches),
+        (GetBlockTransfers::NAME, Some(matches)) => {
+            (GetBlockTransfers::run(matches).await, matches)
         }
-        (GetAuctionInfo::NAME, Some(matches)) => (GetAuctionInfo::run(matches), matches),
-        (Keygen::NAME, Some(matches)) => (Keygen::run(matches), matches),
-        (GenerateCompletion::NAME, Some(matches)) => (GenerateCompletion::run(matches), matches),
-        (ListRpcs::NAME, Some(matches)) => (ListRpcs::run(matches), matches),
-        (AccountAddress::NAME, Some(matches)) => (AccountAddress::run(matches), matches),
+        (ListDeploys::NAME, Some(matches)) => (ListDeploys::run(matches).await, matches),
+        (GetBalance::NAME, Some(matches)) => (GetBalance::run(matches).await, matches),
+        (GetAccountInfo::NAME, Some(matches)) => (GetAccountInfo::run(matches).await, matches),
+        (GetStateRootHash::NAME, Some(matches)) => (GetStateRootHash::run(matches).await, matches),
+        (QueryState::NAME, Some(matches)) => (QueryState::run(matches).await, matches),
+        (GetEraInfoBySwitchBlock::NAME, Some(matches)) => {
+            (GetEraInfoBySwitchBlock::run(matches).await, matches)
+        }
+        (GetAuctionInfo::NAME, Some(matches)) => (GetAuctionInfo::run(matches).await, matches),
+        (Keygen::NAME, Some(matches)) => (Keygen::run(matches).await, matches),
+        (GenerateCompletion::NAME, Some(matches)) => {
+            (GenerateCompletion::run(matches).await, matches)
+        }
+        (ListRpcs::NAME, Some(matches)) => (ListRpcs::run(matches).await, matches),
+        (AccountAddress::NAME, Some(matches)) => (AccountAddress::run(matches).await, matches),
         _ => {
             let _ = cli().print_long_help();
             println!();

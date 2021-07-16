@@ -1,5 +1,6 @@
 use std::str;
 
+use async_trait::async_trait;
 use clap::{App, Arg, ArgMatches, SubCommand};
 
 use casper_client::Error;
@@ -38,6 +39,7 @@ mod deploy_hash {
     }
 }
 
+#[async_trait]
 impl<'a, 'b> ClientCommand<'a, 'b> for GetDeploy {
     const NAME: &'static str = "get-deploy";
     const ABOUT: &'static str = "Retrieves a deploy from the network";
@@ -54,13 +56,14 @@ impl<'a, 'b> ClientCommand<'a, 'b> for GetDeploy {
             .arg(deploy_hash::arg())
     }
 
-    fn run(matches: &ArgMatches<'_>) -> Result<Success, Error> {
+    async fn run(matches: &ArgMatches<'a>) -> Result<Success, Error> {
         let maybe_rpc_id = common::rpc_id::get(matches);
         let node_address = common::node_address::get(matches);
         let verbosity_level = common::verbose::get(matches);
         let deploy_hash = deploy_hash::get(matches);
 
         casper_client::get_deploy(maybe_rpc_id, node_address, verbosity_level, deploy_hash)
+            .await
             .map(Success::from)
     }
 }
