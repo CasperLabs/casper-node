@@ -1,0 +1,215 @@
+[protocol]
+# Protocol version.
+version = '1.0.0'
+# Whether we need to clear latest blocks back to the switch block just before the activation point or not.
+hard_reset = false
+# This protocol version becomes active at this point.
+#
+# If it is a timestamp string, it represents the timestamp for the genesis block.  This is the beginning of era 0.  By
+# this time, a sufficient majority (> 50% + F/2 — see finality_threshold_fraction below) of validator nodes must be up
+# and running to start the blockchain.  This timestamp is also used in seeding the pseudo-random number generator used
+# in contract-runtime for computing genesis post-state hash.
+#
+# If it is an integer, it represents an era ID, meaning the protocol version becomes active at the start of this era.
+activation_point = '${TIMESTAMP}'
+
+[network]
+# Human readable name for convenience; the genesis_hash is the true identifier.  The name influences the genesis hash by
+# contributing to the seeding of the pseudo-random number generator used in contract-runtime for computing genesis
+# post-state hash.
+name = 'casper-example'
+# The maximum size of an acceptable networking message in bytes.  Any message larger than this will
+# be rejected at the networking level.
+maximum_net_message_size = 23_068_672
+
+[core]
+# Era duration.
+era_duration = '41seconds'
+# Minimum number of blocks per era.  An era will take longer than `era_duration` if that is necessary to reach the
+# minimum height.
+minimum_era_height = 10
+# Number of slots available in validator auction.
+validator_slots = 5
+# Number of eras before an auction actually defines the set of validators.  If you bond with a sufficient bid in era N,
+# you will be a validator in era N + auction_delay + 1.
+auction_delay = 3
+# The period after genesis during which a genesis validator's bid is locked.
+locked_funds_period = '90days'
+# Default number of eras that need to pass to be able to withdraw unbonded funds.
+unbonding_delay = 14
+# Round seigniorage rate represented as a fraction of the total supply.
+#
+# Annual issuance: 2%
+# Minimum round exponent: 12
+# Ticks per year: 31536000000
+#
+# (1+0.02)^((2^12)/31536000000)-1 is expressed as a fractional number below.
+round_seigniorage_rate = [0, 1]
+
+[highway]
+# A number between 0 and 1 representing the fault tolerance threshold as a fraction, used by the internal finalizer.
+# It is the fraction of validators that would need to equivocate to make two honest nodes see two conflicting blocks as
+# finalized: A higher value F makes it safer to rely on finalized blocks.  It also makes it more difficult to finalize
+# blocks, however, and requires strictly more than (F + 1)/2 validators to be working correctly.
+finality_threshold_fraction = [1, 3]
+# Integer between 0 and 255.  The power of two that is the number of milliseconds in the minimum round length, and
+# therefore the minimum delay between a block and its child.  E.g. 14 means 2^14 milliseconds, i.e. about 16 seconds.
+minimum_round_exponent = 12
+# Integer between 0 and 255.  Must be greater than `minimum_round_exponent`.  The power of two that is the number of
+# milliseconds in the maximum round length, and therefore the maximum delay between a block and its child.  E.g. 19
+# means 2^19 milliseconds, i.e. about 8.7 minutes.
+maximum_round_exponent = 14
+# The factor by which rewards for a round are multiplied if the greatest summit has ≤50% quorum, i.e. no finality.
+# Expressed as a fraction (1/5 by default).
+reduced_reward_multiplier = [1, 5]
+
+[deploys]
+# The maximum number of Motes allowed to be spent during payment.  0 means unlimited.
+max_payment_cost = '0'
+# The duration after the deploy timestamp that it can be included in a block.
+max_ttl = '1day'
+# The maximum number of other deploys a deploy can depend on (require to have been executed before it can execute).
+max_dependencies = 10
+# Maximum block size in bytes including deploys contained by the block.  0 means unlimited.
+max_block_size = 10_485_760
+# Maximum deploy size in bytes.  Size is of the deploy when serialized via ToBytes.
+max_deploy_size = 1_048_576
+# The maximum number of non-transfer deploys permitted in a single block.
+block_max_deploy_count = 100
+# The maximum number of wasm-less transfer deploys permitted in a single block.
+block_max_transfer_count = 1
+# The upper limit of total gas of all deploys in a block.
+block_gas_limit = 10_000_000_000_000
+# The limit of length of serialized payment code arguments.
+payment_args_max_length = 1024
+# The limit of length of serialized session code arguments.
+session_args_max_length = 1024
+# The minimum amount in motes for a valid native transfer.
+native_transfer_minimum_motes = 2_500_000_000
+
+[wasm]
+# Amount of free memory (in 64kB pages) each contract can use for stack.
+max_memory = 64
+# Max stack height (native WebAssembly stack limiter).
+max_stack_height = 65_536
+
+[wasm.storage_costs]
+# Gas charged per byte stored in the global state.
+gas_per_byte = 630_000
+
+[wasm.opcode_costs]
+# Bit operations multiplier.
+bit = 300
+# Arithmetic add operations multiplier.
+add = 210
+# Mul operations multiplier.
+mul = 240
+# Div operations multiplier.
+div = 320
+# Memory load operation multiplier.
+load = 2_500
+# Memory store operation multiplier.
+store = 4_700
+# Const store operation multiplier.
+const = 110
+# Local operations multiplier.
+local = 390
+# Global operations multiplier.
+global = 390
+# Control flow operations multiplier.
+control_flow = 440
+# Integer operations multiplier.
+integer_comparison = 250
+# Conversion operations multiplier.
+conversion = 420
+# Unreachable operation multiplier.
+unreachable = 270
+# Nop operation multiplier.
+nop = 200
+# Get current memory operation multiplier.
+current_memory = 290
+# Grow memory cost, per page (64kb).
+grow_memory = 240_000
+# Regular opcode cost.
+regular = 210
+
+# Host function declarations are located in smart_contracts/contract/src/ext_ffi.rs
+[wasm.host_function_costs]
+add = { cost = 5_800, arguments = [0, 0, 0, 0] }
+add_associated_key = { cost = 9_000, arguments = [0, 0, 0] }
+add_contract_version = { cost = 200, arguments = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] }
+blake2b = { cost = 200, arguments = [0, 0, 0, 0] }
+call_contract = { cost = 4_500, arguments = [0, 0, 0, 0, 0, 420, 0] }
+call_versioned_contract = { cost = 200, arguments = [0, 0, 0, 0, 0, 0, 0, 0, 0] }
+create_contract_package_at_hash = { cost = 200, arguments = [0, 0] }
+create_contract_user_group = { cost = 200, arguments = [0, 0, 0, 0, 0, 0, 0, 0] }
+create_purse = { cost = 170_000, arguments = [0, 0] }
+disable_contract_version = { cost = 200, arguments = [0, 0, 0, 0] }
+get_balance = { cost = 3_800, arguments = [0, 0, 0] }
+get_blocktime = { cost = 330, arguments = [0] }
+get_caller = { cost = 380, arguments = [0] }
+get_key = { cost = 2_000, arguments = [0, 440, 0, 0, 0] }
+get_main_purse = { cost = 1_300, arguments = [0] }
+get_named_arg = { cost = 200, arguments = [0, 0, 0, 0] }
+get_named_arg_size = { cost = 200, arguments = [0, 0, 0] }
+get_phase = { cost = 710, arguments = [0] }
+get_system_contract = { cost = 1_100, arguments = [0, 0, 0] }
+has_key = { cost = 1_500, arguments = [0, 840] }
+is_valid_uref = { cost = 760, arguments = [0, 0] }
+load_named_keys = { cost = 42_000, arguments = [0, 0] }
+new_uref = { cost = 17_000, arguments = [0, 0, 590] }
+print = { cost = 20_000, arguments = [0, 4_600] }
+provision_contract_user_group_uref = { cost = 200, arguments = [0, 0, 0, 0, 0] }
+put_key = { cost = 38_000, arguments = [0, 1_100, 0, 0] }
+read_host_buffer = { cost = 3_500, arguments = [0, 310, 0] }
+read_value = { cost = 6_000, arguments = [0, 0, 0] }
+read_value_local = { cost = 5_500, arguments = [0, 590, 0] }
+remove_associated_key = { cost = 4_200, arguments = [0, 0] }
+remove_contract_user_group = { cost = 200, arguments = [0, 0, 0, 0] }
+remove_contract_user_group_urefs = { cost = 200, arguments = [0, 0, 0, 0, 0, 0] }
+remove_key = { cost = 61_000, arguments = [0, 3_200] }
+ret = { cost = 23_000, arguments = [0, 420_000] }
+revert = { cost = 500, arguments = [0] }
+set_action_threshold = { cost = 74_000, arguments = [0, 0] }
+transfer_from_purse_to_account = { cost = 160_000, arguments = [0, 0, 0, 0, 0, 0, 0, 0, 0] }
+transfer_from_purse_to_purse = { cost = 82_000, arguments = [0, 0, 0, 0, 0, 0, 0, 0] }
+transfer_to_account = { cost = 24_000, arguments = [0, 0, 0, 0, 0, 0, 0] }
+update_associated_key = { cost = 4_200, arguments = [0, 0, 0] }
+write = { cost = 14_000, arguments = [0, 0, 0, 980] }
+write_local = { cost = 9_500, arguments = [0, 1_800, 0, 520] }
+delete = { cost = 14_000, arguments = [0, 0] }
+
+[system_costs]
+wasmless_transfer_cost = 10_000
+
+[system_costs.auction_costs]
+get_era_validators = 10_000
+read_seigniorage_recipients = 10_000
+add_bid = 10_000
+withdraw_bid = 10_000
+delegate = 10_000
+undelegate = 10_000
+run_auction = 10_000
+slash = 10_000
+distribute = 10_000
+withdraw_delegator_reward = 10_000
+withdraw_validator_reward = 10_000
+read_era_id = 10_000
+activate_bid = 10_000
+
+[system_costs.mint_costs]
+mint = 10_000
+reduce_total_supply = 10_000
+create = 10_000
+balance = 10_000
+transfer = 10_000
+read_base_round_reward = 10_000
+
+[system_costs.handle_payment_costs]
+get_payment_purse = 10_000
+set_refund_purse = 10_000
+get_refund_purse = 10_000
+finalize_payment = 10_000
+
+[system_costs.standard_payment_costs]
+pay = 10_000

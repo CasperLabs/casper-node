@@ -151,3 +151,4 @@ alias nctl-kv-storage-set-key='source $NCTL/sh/contracts-kv/set_key.sh'
 # Scenarios #1: Execute protocol upgrade.
 alias nctl-exec-upgrade-scenario-1='source $NCTL/sh/scenarios-upgrades/upgrade_scenario_01.sh'
 alias nctl-exec-upgrade-scenario-2='source $NCTL/sh/scenarios-upgrades/upgrade_scenario_02.sh'
+alias nctl-exec-upgrade-scenario-3='source $NCTL/sh/scenarios-upgrades/upgrade_scenario_03.sh'

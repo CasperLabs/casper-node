@@ -11,6 +11,7 @@ function await_n_eras()
 {
     local OFFSET=${1}
     local EMIT_LOG=${2:-false}
+    local SLEEP_INTERVAL=${3:-'20.0'}
     local CURRENT
     local FUTURE
 
@@ -20,9 +21,9 @@ function await_n_eras()
     while [ "$CURRENT" -lt "$FUTURE" ];
     do
         if [ "$EMIT_LOG" = true ]; then
-            log "current era = $CURRENT :: future era = $FUTURE ... sleeping 20 seconds"
+            log "current era = $CURRENT :: future era = $FUTURE ... sleeping $SLEEP_INTERVAL seconds"
         fi
-        sleep 20.0
+        sleep "$SLEEP_INTERVAL"
         CURRENT=$(get_chain_era)
     done
 

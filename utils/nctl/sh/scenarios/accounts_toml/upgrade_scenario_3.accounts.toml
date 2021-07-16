@@ -1,0 +1,134 @@
+# FAUCET.
+[[accounts]]
+public_key = "PBK_FAUCET"
+balance = "1000000000000000000000000000000000"
+
+# VALIDATOR 1.
+[[accounts]]
+public_key = "PBK_V1"
+balance = "1000000000000000000000000000000000"
+
+[accounts.validator]
+bonded_amount = "1"
+delegation_rate = 1
+
+# VALIDATOR 2.
+[[accounts]]
+public_key = "PBK_V2"
+balance = "1000000000000000000000000000000000"
+
+[accounts.validator]
+bonded_amount = "1"
+delegation_rate = 2
+
+# VALIDATOR 3.
+[[accounts]]
+public_key = "PBK_V3"
+balance = "1000000000000000000000000000000000"
+
+[accounts.validator]
+bonded_amount = "1"
+delegation_rate = 3
+
+# VALIDATOR 4.
+[[accounts]]
+public_key = "PBK_V4"
+balance = "1000000000000000000000000000000000"
+
+[accounts.validator]
+bonded_amount = "1"
+delegation_rate = 4
+
+# VALIDATOR 5.
+[[accounts]]
+public_key = "PBK_V5"
+balance = "1000000000000000000000000000000000"
+
+[accounts.validator]
+bonded_amount = "1"
+delegation_rate = 5
+
+# VALIDATOR 6.
+[[accounts]]
+public_key = "PBK_V6"
+balance = "1000000000000000000000000000000000"
+
+# VALIDATOR 7.
+[[accounts]]
+public_key = "PBK_V7"
+balance = "1000000000000000000000000000000000"
+
+# VALIDATOR 8.
+[[accounts]]
+public_key = "PBK_V8"
+balance = "1000000000000000000000000000000000"
+
+# VALIDATOR 9.
+[[accounts]]
+public_key = "PBK_V9"
+balance = "1000000000000000000000000000000000"
+
+# VALIDATOR 10.
+[[accounts]]
+public_key = "PBK_V10"
+balance = "1000000000000000000000000000000000"
+
+# USER 1.
+[[delegators]]
+validator_public_key = "PBK_V1"
+delegator_public_key = "PBK_U1"
+balance = "1000000000000000000000000000000000"
+delegated_amount = "1"
+
+# USER 2.
+[[delegators]]
+validator_public_key = "PBK_V2"
+delegator_public_key = "PBK_U2"
+balance = "1000000000000000000000000000000000"
+delegated_amount = "1"
+
+# USER 3.
+[[delegators]]
+validator_public_key = "PBK_V3"
+delegator_public_key = "PBK_U3"
+balance = "1000000000000000000000000000000000"
+delegated_amount = "1"
+
+# USER 4.
+[[delegators]]
+validator_public_key = "PBK_V4"
+delegator_public_key = "PBK_U4"
+balance = "1000000000000000000000000000000000"
+delegated_amount = "1"
+
+# USER 5.
+[[delegators]]
+validator_public_key = "PBK_V4"
+delegator_public_key = "PBK_U5"
+balance = "1000000000000000000000000000000000"
+delegated_amount = "1"
+
+# USER 6.
+[[accounts]]
+public_key = "PBK_U6"
+balance = "1000000000000000000000000000000000"
+
+# USER 7.
+[[accounts]]
+public_key = "PBK_U7"
+balance = "1000000000000000000000000000000000"
+
+# USER 8.
+[[accounts]]
+public_key = "PBK_U8"
+balance = "1000000000000000000000000000000000"
+
+# USER 9.
+[[accounts]]
+public_key = "PBK_U9"
+balance = "1000000000000000000000000000000000"
+
+# USER 10.
+[[accounts]]
+public_key = "PBK_U10"
+balance = "1000000000000000000000000000000000"

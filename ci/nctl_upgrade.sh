@@ -25,6 +25,7 @@ function main() {
 
     # Start
     start_upgrade_scenario_1
+    start_upgrade_scenario_3
 }
 
 # Pulls down all remotely staged files
@@ -120,4 +121,8 @@ function start_upgrade_scenario_1() {
     nctl-exec-upgrade-scenario-1
 }
 
+function start_upgrade_scenario_3() {
+    log "... Starting Upgrade Scenario 3"
+    nctl-exec-upgrade-scenario-3
+}
 main "$1"

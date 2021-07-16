@@ -34,6 +34,7 @@ function _main()
     local COUNT_NODES=$((COUNT_NODES_AT_GENESIS * 2))
     local GENESIS_DELAY=${3}
     local PATH_TO_ACCOUNTS=${4}
+    local PATH_TO_CHAINSPEC=${5}
     local COUNT_USERS="$COUNT_NODES"
     local PATH_TO_NET
     local PATH_TO_STAGE
@@ -62,11 +63,19 @@ function _main()
                          "$PATH_TO_STAGED_ASSETS"
     setup_asset_keys "$COUNT_NODES" "$COUNT_USERS"
     setup_asset_daemon
+
+    if [ ! -z "$PATH_TO_CHAINSPEC" ]; then
+        for subdir in $(find $(get_path_to_stage "$STAGE_ID")/* -type d); do
+            cp "$PATH_TO_CHAINSPEC" "$subdir/chainspec.toml"
+        done
+    fi
+
     setup_asset_chainspec "$COUNT_NODES" \
                           "$PROTOCOL_VERSION" \
                           $(get_genesis_timestamp "$GENESIS_DELAY") \
                           "$PATH_TO_STAGED_ASSETS/chainspec.toml" \
                           true
+
     if [ "$PATH_TO_ACCOUNTS" = "" ]; then
         setup_asset_accounts "$COUNT_NODES" \
                              "$COUNT_NODES_AT_GENESIS" \
@@ -108,6 +117,7 @@ unset GENESIS_DELAY_SECONDS
 unset NET_ID
 unset NODE_COUNT
 unset STAGE_ID
+unset PATH_TO_CHAINSPEC
 
 for ARGUMENT in "$@"
 do
@@ -119,6 +129,7 @@ do
         net) NET_ID=${VALUE} ;;
         nodes) NODE_COUNT=${VALUE} ;;
         stage) STAGE_ID=${VALUE} ;;
+        chainspec_path) PATH_TO_CHAINSPEC=${VALUE} ;;
         *)
     esac
 done
@@ -128,8 +139,10 @@ GENESIS_DELAY_SECONDS=${GENESIS_DELAY_SECONDS:-30}
 NODE_COUNT=${NODE_COUNT:-5}
 PATH_TO_ACCOUNTS=${PATH_TO_ACCOUNTS:-""}
 STAGE_ID="${STAGE_ID:-1}"
+PATH_TO_CHAINSPEC=${PATH_TO_CHAINSPEC:-""}
 
 _main "$STAGE_ID" \
       "$NODE_COUNT" \
       "$GENESIS_DELAY_SECONDS" \
-      "$PATH_TO_ACCOUNTS"
+      "$PATH_TO_ACCOUNTS" \
+      "$PATH_TO_CHAINSPEC"
