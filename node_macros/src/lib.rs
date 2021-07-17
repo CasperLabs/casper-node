@@ -1,6 +1,6 @@
 //! Generates reactors with routing from concise definitions. See `README.md` for details.
 
-#![doc(html_root_url = "https://docs.rs/casper-node-macros/1.0.0")]
+#![doc(html_root_url = "https://docs.rs/casper-node-macros/1.3.0")]
 #![doc(
     html_favicon_url = "https://raw.githubusercontent.com/CasperLabs/casper-node/master/images/CasperLabs_Logo_Favicon_RGB_50px.png",
     html_logo_url = "https://raw.githubusercontent.com/CasperLabs/casper-node/master/images/CasperLabs_Logo_Symbol_RGB.png",

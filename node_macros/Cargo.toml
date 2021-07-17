@@ -1,6 +1,6 @@
 [package]
 name = "casper-node-macros"
-version = "1.0.0"
+version = "1.3.0"
 authors = ["Marc Brinkmann <marc@casperlabs.io>"]
 edition = "2018"
 description = "A macro to create reactor implementations for the casper-node."

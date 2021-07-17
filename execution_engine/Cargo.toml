@@ -1,6 +1,6 @@
 [package]
 name = "casper-execution-engine"
-version = "1.0.0" # when updating, also update 'html_root_url' in lib.rs
+version = "1.3.0" # when updating, also update 'html_root_url' in lib.rs
 authors = ["Henry Till <henrytill@gmail.com>", "Ed Hastings <ed@casperlabs.io>"]
 edition = "2018"
 description = "CasperLabs execution engine crates."
@@ -15,7 +15,7 @@ anyhow = "1.0.33"
 base16 = "0.2.1"
 bincode = "1.3.1"
 blake2 = "0.9.0"
-casper-types = { version = "1.0.0", path = "../types", features = ["std", "gens"] }
+casper-types = { version = "1.3.0", path = "../types", features = ["std", "gens"] }
 chrono = "0.4.10"
 datasize = "0.2.4"
 hex = { version = "0.4.2", default-features = false, features = ["serde"] }

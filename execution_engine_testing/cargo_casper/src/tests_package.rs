@@ -115,7 +115,7 @@ static INTEGRATION_TESTS_RS: Lazy<PathBuf> = Lazy::new(|| {
 static ENGINE_TEST_SUPPORT: Lazy<Dependency> = Lazy::new(|| {
     Dependency::new(
         "casper-engine-test-support",
-        "1.0.0",
+        "1.3.0",
         "execution_engine_testing/test_support",
     )
 });

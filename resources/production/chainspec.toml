@@ -1,6 +1,6 @@
 [protocol]
 # Protocol version.
-version = '1.0.0'
+version = '1.3.0'
 # Whether we need to clear latest blocks back to the switch block just before the activation point or not.
 hard_reset = false
 # This protocol version becomes active at this point.
@@ -11,7 +11,7 @@ hard_reset = false
 # in contract-runtime for computing genesis post-state hash.
 #
 # If it is an integer, it represents an era ID, meaning the protocol version becomes active at the start of this era.
-activation_point = '2021-03-31T15:00:00Z'
+activation_point = 1461
 # Optional era ID in which the last emergency restart happened.
 #last_emergency_restart = 0
 

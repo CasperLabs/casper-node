@@ -1,6 +1,6 @@
 [package]
 name = "casper-contract"
-version = "1.0.0" # when updating, also update 'html_root_url' in lib.rs
+version = "1.3.0" # when updating, also update 'html_root_url' in lib.rs
 authors = ["Michael Birch <birchmd@casperlabs.io>", "Mateusz Górski <gorski.mateusz@protonmail.ch>"]
 edition = "2018"
 description = "Library for developing Casper smart contracts."
@@ -11,7 +11,7 @@ repository = "https://github.com/CasperLabs/casper-node/tree/master/smart_contra
 license-file = "../../LICENSE"
 
 [dependencies]
-casper-types = { version = "1.0.0", path = "../../types" }
+casper-types = { version = "1.3.0", path = "../../types" }
 hex_fmt = "0.3.0"
 thiserror = "1.0.18"
 version-sync = { version = "0.9", optional = true }
