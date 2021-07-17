@@ -1080,15 +1080,8 @@ where
                 // the block or seen as equivocating via the consensus protocol gets faulty.
                 let era_end = terminal_block_data.map(|tbd| EraReport {
                     rewards: tbd.rewards,
-                    // TODO: This is a temporary change to disable slashing; we just report all
-                    // equivocators as "inactive" instead. Change this back and put
-                    // era.accusations() into equivocators instead of inactive_validators.
-                    equivocators: vec![],
-                    inactive_validators: tbd
-                        .inactive_validators
-                        .into_iter()
-                        .chain(era.accusations())
-                        .collect(),
+                    equivocators: era.accusations(),
+                    inactive_validators: tbd.inactive_validators,
                 });
                 let finalized_block = FinalizedBlock::new(
                     Arc::try_unwrap(value).unwrap_or_else(|arc| (*arc).clone()),

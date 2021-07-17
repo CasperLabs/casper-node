@@ -25,8 +25,8 @@ use tracing::{debug, error, trace};
 use casper_execution_engine::{
     core::engine_state::{
         self, genesis::GenesisResult, step::EvictItem, DeployItem, EngineConfig, EngineState,
-        ExecuteRequest, GetEraValidatorsError, GetEraValidatorsRequest, RewardItem, SlashItem,
-        StepRequest, StepResult,
+        ExecuteRequest, GetEraValidatorsError, GetEraValidatorsRequest, RewardItem, StepRequest,
+        StepResult,
     },
     shared::newtypes::{Blake2bHash, CorrelationId},
     storage::{
@@ -43,10 +43,11 @@ use crate::{
     components::Component,
     crypto::hash::Digest,
     effect::{
-        announcements::ContractRuntimeAnnouncement,
+        announcements::{ContractRuntimeAnnouncement, ControlAnnouncement},
         requests::{ConsensusRequest, ContractRuntimeRequest, LinearChainRequest, StorageRequest},
         EffectBuilder, EffectExt, Effects,
     },
+    fatal,
     types::{
         Block, BlockHash, BlockHeader, Chainspec, Deploy, DeployHash, DeployHeader, FinalizedBlock,
         NodeId,
@@ -109,6 +110,7 @@ pub trait ReactorEventT:
     + From<LinearChainRequest<NodeId>>
     + From<ContractRuntimeRequest>
     + From<ContractRuntimeAnnouncement>
+    + From<ControlAnnouncement>
     + From<ConsensusRequest>
     + Send
 {
@@ -120,6 +122,7 @@ impl<REv> ReactorEventT for REv where
         + From<LinearChainRequest<NodeId>>
         + From<ContractRuntimeRequest>
         + From<ContractRuntimeAnnouncement>
+        + From<ControlAnnouncement>
         + From<ConsensusRequest>
         + Send
 {
@@ -465,6 +468,14 @@ where
                         step_request,
                         responder,
                     } => {
+                        if !step_request.slash_items.is_empty() {
+                            return fatal!(
+                                effect_builder,
+                                "unexpected slash items: {:?}",
+                                step_request.slash_items,
+                            )
+                            .ignore();
+                        }
                         trace!(?step_request, "step request");
                         let engine_state = Arc::clone(&self.engine_state);
                         let metrics = Arc::clone(&self.metrics);
@@ -867,14 +878,11 @@ impl ContractRuntime {
             .iter()
             .map(|(vid, &value)| RewardItem::new(vid.clone(), value))
             .collect();
-        let slash_items = era_end
-            .equivocators
-            .iter()
-            .map(|vid| SlashItem::new(vid.clone()))
-            .collect();
+        let slash_items = vec![]; // TODO: Handle equivocators differently.
         let evict_items = era_end
             .inactive_validators
             .iter()
+            .chain(&era_end.equivocators)
             .map(|vid| EvictItem::new(vid.clone()))
             .collect();
         let era_end_timestamp_millis = state.finalized_block.timestamp().millis();
@@ -1090,6 +1098,12 @@ impl ContractRuntime {
     /// either genesis or the highest known block at the time of initializing the component.
     fn is_initial_block_child(&self, finalized_block: &FinalizedBlock) -> bool {
         finalized_block.height() == self.initial_state.child_height
+    }
+
+    /// Returns the engine state, for testing only.
+    #[cfg(test)]
+    pub(crate) fn engine_state(&self) -> &Arc<EngineState<LmdbGlobalState>> {
+        &self.engine_state
     }
 }
 
