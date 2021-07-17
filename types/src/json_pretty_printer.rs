@@ -5,7 +5,7 @@ use alloc::{format, string::String, vec::Vec};
 use serde::Serialize;
 use serde_json::{json, Value};
 
-const MAX_STRING_LEN: usize = 100;
+const MAX_STRING_LEN: usize = 150;
 
 /// Serializes the given data structure as a pretty-printed `String` of JSON using
 /// `serde_json::to_string_pretty()`, but after first reducing any large hex-string values.
